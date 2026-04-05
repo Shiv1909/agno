@@ -1,4 +1,5 @@
 import json
+import warnings
 from os import getenv
 from pathlib import Path
 from textwrap import dedent
@@ -73,6 +74,14 @@ class DaytonaTools(Toolkit):
         add_instructions: bool = False,
         **kwargs,
     ):
+        warnings.warn(
+            "DaytonaTools is deprecated. Use BackendToolkit(DaytonaSandbox(...)) from agno.backends.daytona "
+            "for a unified sandbox interface with ls, read_file, write_file, edit_file, grep, glob, and execute. "
+            "See agno.tools.backend.BackendToolkit for details.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         self.api_key = api_key or getenv("DAYTONA_API_KEY")
         if not self.api_key:
             raise ValueError("DAYTONA_API_KEY not set. Please set the DAYTONA_API_KEY environment variable.")

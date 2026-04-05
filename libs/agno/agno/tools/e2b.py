@@ -2,6 +2,7 @@ import base64
 import json
 import tempfile
 import time
+import warnings
 from os import fdopen, getenv
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Union
@@ -31,11 +32,28 @@ class E2BTools(Toolkit):
     ):
         """Initialize E2B toolkit for code interpretation and running Python code in a sandbox.
 
+        .. deprecated::
+            Use ``BackendToolkit(E2BSandbox(...))`` instead for a unified interface
+            with ls, read_file, write_file, edit_file, grep, glob, execute, and more.
+
+            Example::
+
+                from agno.backends.e2b import E2BSandbox
+                from agno.tools.backend import BackendToolkit
+                agent = Agent(tools=[BackendToolkit(E2BSandbox(api_key="..."))])
+
         Args:
             api_key: E2B API key (defaults to E2B_API_KEY environment variable)
             timeout: Timeout in seconds for the sandbox (default: 5 minutes)
             sandbox_options: Additional options to pass to the Sandbox constructor
         """
+        warnings.warn(
+            "E2BTools is deprecated. Use BackendToolkit(E2BSandbox(...)) from agno.backends.e2b "
+            "for a unified sandbox interface with ls, read_file, write_file, edit_file, grep, glob, and execute. "
+            "See agno.tools.backend.BackendToolkit for details.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
         self.api_key = api_key or getenv("E2B_API_KEY")
         if not self.api_key:
