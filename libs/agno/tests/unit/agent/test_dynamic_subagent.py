@@ -221,3 +221,32 @@ def test_agent_wires_toolkit_with_custom_config():
     assert toolkit is not None
     assert toolkit._config.markdown is True
     assert toolkit._config.max_concurrent == 2
+
+
+# ---------------------------------------------------------------------------
+# Team integration tests
+# ---------------------------------------------------------------------------
+
+
+def test_team_has_dynamic_subagent_fields():
+    """Team accepts enable_dynamic_subagents and subagent_config."""
+    from agno.agent.agent import Agent
+    from agno.team.team import Team
+
+    member = Agent(name="member")
+    team = Team(members=[member], enable_dynamic_subagents=False)
+    assert team.enable_dynamic_subagents is False
+    assert team.subagent_config is None
+
+
+def test_team_wires_toolkit_when_enabled():
+    """SubAgentToolkit is added to team.tools after initialize_team runs."""
+    from agno.agent.agent import Agent
+    from agno.team.team import Team
+
+    member = Agent(name="member")
+    team = Team(members=[member], enable_dynamic_subagents=True)
+    team.initialize_team()
+
+    toolkit_found = any(isinstance(t, SubAgentToolkit) for t in (team.tools or []))
+    assert toolkit_found, "SubAgentToolkit should be in team.tools when enable_dynamic_subagents=True"

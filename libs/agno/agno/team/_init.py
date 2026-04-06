@@ -180,6 +180,8 @@ def __init__(
     callable_tools_cache_key: Optional[Callable[..., Optional[str]]] = None,
     callable_knowledge_cache_key: Optional[Callable[..., Optional[str]]] = None,
     callable_members_cache_key: Optional[Callable[..., Optional[str]]] = None,
+    enable_dynamic_subagents: bool = False,
+    subagent_config: Optional[Any] = None,
 ):
     from agno.utils.callables import is_callable_factory
 
@@ -371,6 +373,9 @@ def __init__(
             TeamRunEvent.run_content,
         ]
     team.stream_member_events = stream_member_events
+
+    team.enable_dynamic_subagents = enable_dynamic_subagents
+    team.subagent_config = subagent_config
 
     team.debug_mode = debug_mode
     if debug_level not in [1, 2]:
@@ -690,6 +695,27 @@ def _resolve_models(team: "Team") -> None:
         team.fallback_config.resolve_models()
 
 
+def _set_dynamic_subagents(team: "Team") -> None:
+    """Append SubAgentToolkit to team.tools when enable_dynamic_subagents is True."""
+    if not team.enable_dynamic_subagents:
+        return
+
+    from agno.agent.subagent import SubAgentConfig, SubAgentToolkit
+
+    config = team.subagent_config or SubAgentConfig()
+    toolkit = SubAgentToolkit(parent=team, config=config)
+
+    if isinstance(team.tools, list):
+        team.tools.append(toolkit)
+    elif team.tools is None:
+        team.tools = [toolkit]
+    else:
+        log_warning(
+            "enable_dynamic_subagents=True is not supported when tools is a callable factory. "
+            "Pass tools as a list instead."
+        )
+
+
 def initialize_team(team: "Team", debug_mode: Optional[bool] = None) -> None:
     # Make sure for the team, we are using the team logger
     use_team_logger()
@@ -717,6 +743,8 @@ def initialize_team(team: "Team", debug_mode: Optional[bool] = None) -> None:
         _set_compression_manager(team)
     if team.learning is not None and team.learning is not False:
         _set_learning_machine(team)
+    if team.enable_dynamic_subagents:
+        _set_dynamic_subagents(team)
 
     log_debug(f"Team ID: {team.id}", center=True)
 
