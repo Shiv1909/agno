@@ -8,6 +8,7 @@ from agno.agent.agent import (
     get_agents,
 )
 from agno.agent.remote import RemoteAgent
+from agno.agent.subagent import SubAgentConfig, SubAgentToolkit
 from agno.models.fallback import FallbackConfig
 from agno.run.agent import (
     Followups,
@@ -62,4 +63,6 @@ __all__ = [
     "ToolCallCompletedEvent",
     "get_agent_by_id",
     "get_agents",
+    "SubAgentConfig",
+    "SubAgentToolkit",
 ]
