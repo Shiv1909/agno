@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from agno.agent.subagent import SubAgentConfig, SubAgentToolkit
 
@@ -250,3 +252,110 @@ def test_team_wires_toolkit_when_enabled():
 
     toolkit_found = any(isinstance(t, SubAgentToolkit) for t in (team.tools or []))
     assert toolkit_found, "SubAgentToolkit should be in team.tools when enable_dynamic_subagents=True"
+
+
+# ---------------------------------------------------------------------------
+# Async spawn tests
+# ---------------------------------------------------------------------------
+
+
+def _make_mock_agent(content: object = "ok") -> MagicMock:
+    """Return a MagicMock that quacks like an Agent with arun/run."""
+    agent_mock = MagicMock()
+    result_mock = MagicMock()
+    result_mock.content = content
+    agent_mock.arun = AsyncMock(return_value=result_mock)
+    agent_mock.run = MagicMock(return_value=result_mock)
+    return agent_mock
+
+
+@pytest.mark.asyncio
+async def test_aspawn_agent_returns_content():
+    """aspawn_agent returns the subagent's content string."""
+    toolkit = _make_toolkit()
+
+    mock_agent = _make_mock_agent(content="Subagent answer")
+
+    with patch("agno.agent.agent.Agent", return_value=mock_agent):
+        answer = await toolkit.aspawn_agent(
+            role="helper",
+            instructions="Do the thing",
+            task="What is 1+1?",
+        )
+    assert answer == "Subagent answer"
+
+
+@pytest.mark.asyncio
+async def test_aspawn_agent_no_content_returns_fallback():
+    """aspawn_agent returns fallback message when content is None."""
+    toolkit = _make_toolkit()
+
+    mock_agent = _make_mock_agent(content=None)
+
+    with patch("agno.agent.agent.Agent", return_value=mock_agent):
+        answer = await toolkit.aspawn_agent(
+            role="helper",
+            instructions="Do the thing",
+            task="What is 1+1?",
+        )
+    assert answer == "Subagent completed with no output."
+
+
+@pytest.mark.asyncio
+async def test_aspawn_agent_injects_session_state():
+    """When inject_session_state=True, the built Agent receives additional_context with the state."""
+    parent = MagicMock()
+    parent.model = None
+    parent.tools = []
+    parent.knowledge = None
+    parent.session_state = {"user": "alice"}
+    parent.id = "parent-id"
+
+    config = SubAgentConfig(inject_session_state=True)
+    toolkit = SubAgentToolkit(parent=parent, config=config)
+
+    captured_kwargs: dict = {}
+
+    def fake_agent_init(*args: object, **kwargs: object) -> MagicMock:
+        captured_kwargs.update(kwargs)
+        agent_mock = _make_mock_agent(content="ok")
+        return agent_mock
+
+    with patch("agno.agent.agent.Agent", side_effect=fake_agent_init):
+        await toolkit.aspawn_agent(
+            role="helper",
+            instructions="Help out",
+            task="greet",
+        )
+
+    assert "additional_context" in captured_kwargs
+    assert "alice" in captured_kwargs["additional_context"]
+
+
+def test_resolve_tools_whitelist_filtering():
+    """_resolve_tools includes a toolkit when at least one of its functions is in allowed_tools."""
+    from agno.tools import Toolkit as _Toolkit
+
+    class FakeToolkit(_Toolkit):
+        """Minimal toolkit subclass with do_search and do_write functions registered."""
+
+        def __init__(self) -> None:
+            super().__init__(name="fake")
+            self.functions["do_search"] = MagicMock()
+            self.functions["do_write"] = MagicMock()
+
+    fake_tk = FakeToolkit()
+
+    parent = MagicMock()
+    parent.model = None
+    parent.tools = [fake_tk]
+    parent.knowledge = None
+    parent.session_state = None
+    parent.id = "parent-id"
+
+    config = SubAgentConfig(allowed_tools=["do_search"])
+    toolkit = SubAgentToolkit(parent=parent, config=config)
+
+    resolved = toolkit._resolve_tools(["do_search", "do_write"])
+
+    assert fake_tk in resolved, "FakeToolkit should be included because do_search is in allowed_tools"
