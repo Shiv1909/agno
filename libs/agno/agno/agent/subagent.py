@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Union
 from pydantic import BaseModel, ConfigDict
 
 from agno.tools import Toolkit
-from agno.utils.log import log_warning
+from agno.utils.log import log_debug, log_warning
 
 if TYPE_CHECKING:
     from agno.agent.agent import Agent
@@ -152,11 +152,26 @@ class SubAgentToolkit(Toolkit):
         model_override: Optional[str],
     ) -> Agent:
         from agno.agent.agent import Agent
+        from agno.team.team import Team
 
         model = self._resolve_model(model_override)
         resolved_tools = self._resolve_tools(tool_names)
         knowledge = self._resolve_knowledge()
         additional_context = self._build_additional_context()
+
+        parent_id = getattr(self._parent, "id", None)
+        parent_name = getattr(self._parent, "name", None)
+        spawn_depth: int = (getattr(self._parent, "metadata", None) or {}).get("spawn_depth", 0) + 1
+
+        # Only set team_id when the parent is actually a Team, so DB queries remain correct.
+        # For Agent parents we carry lineage purely through metadata.
+        team_id = parent_id if isinstance(self._parent, Team) else None
+
+        log_debug(
+            f"Spawning subagent | parent={parent_name}({parent_id}) "
+            f"role={role} depth={spawn_depth}"
+        )
+
         return Agent(
             name=role,
             model=model,
@@ -186,11 +201,19 @@ class SubAgentToolkit(Toolkit):
             exponential_backoff=self._config.exponential_backoff,
             pre_hooks=self._config.pre_hooks,
             post_hooks=self._config.post_hooks,
-            team_id=getattr(self._parent, "id", None),
+            team_id=team_id,
             db=None,
             stream=False,
             telemetry=False,
             debug_mode=self._config.debug_mode,
+            # Lineage: every subagent carries who spawned it, for what, and how deep
+            metadata={
+                "spawned_by_agent_id": parent_id,
+                "spawned_by_agent_name": parent_name,
+                "spawn_role": role,
+                "spawn_task": (instructions[:200] + "...") if len(instructions) > 200 else instructions,
+                "spawn_depth": spawn_depth,
+            },
         )
 
     def _resolve_model(self, model_override: Optional[str]) -> Any:

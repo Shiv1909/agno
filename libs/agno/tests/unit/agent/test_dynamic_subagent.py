@@ -359,3 +359,136 @@ def test_resolve_tools_whitelist_filtering():
     resolved = toolkit._resolve_tools(["do_search", "do_write"])
 
     assert fake_tk in resolved, "FakeToolkit should be included because do_search is in allowed_tools"
+
+
+# ---------------------------------------------------------------------------
+# Lineage / metadata tests
+# ---------------------------------------------------------------------------
+
+
+def test_subagent_metadata_carries_lineage():
+    """_build_subagent passes spawned_by_* and spawn_depth in metadata."""
+    captured: dict = {}
+
+    def fake_agent_init(*args: object, **kwargs: object) -> MagicMock:
+        captured.update(kwargs)
+        return MagicMock()
+
+    parent = MagicMock()
+    parent.model = None
+    parent.tools = []
+    parent.knowledge = None
+    parent.session_state = None
+    parent.id = "parent-42"
+    parent.name = "orchestrator"
+    parent.metadata = {}  # depth 0 parent
+
+    config = SubAgentConfig()
+    toolkit = SubAgentToolkit(parent=parent, config=config)
+
+    with patch("agno.agent.agent.Agent", side_effect=fake_agent_init):
+        toolkit._build_subagent(
+            role="rust_dev",
+            instructions="Write Rust code.",
+            tool_names=None,
+            expected_output=None,
+            model_override=None,
+        )
+
+    meta = captured.get("metadata", {})
+    assert meta.get("spawned_by_agent_id") == "parent-42"
+    assert meta.get("spawned_by_agent_name") == "orchestrator"
+    assert meta.get("spawn_role") == "rust_dev"
+    assert meta.get("spawn_depth") == 1
+    assert "spawn_task" in meta
+
+
+def test_subagent_spawn_depth_increments():
+    """spawn_depth increments when parent itself was a subagent (depth 1 → child is depth 2)."""
+    captured: dict = {}
+
+    def fake_agent_init(*args: object, **kwargs: object) -> MagicMock:
+        captured.update(kwargs)
+        return MagicMock()
+
+    # Simulate a parent that was itself spawned (depth=1 in its metadata)
+    parent = MagicMock()
+    parent.model = None
+    parent.tools = []
+    parent.knowledge = None
+    parent.session_state = None
+    parent.id = "subagent-1"
+    parent.name = "intermediate"
+    parent.metadata = {"spawn_depth": 1}
+
+    config = SubAgentConfig()
+    toolkit = SubAgentToolkit(parent=parent, config=config)
+
+    with patch("agno.agent.agent.Agent", side_effect=fake_agent_init):
+        toolkit._build_subagent(
+            role="child",
+            instructions="Do something.",
+            tool_names=None,
+            expected_output=None,
+            model_override=None,
+        )
+
+    assert captured.get("metadata", {}).get("spawn_depth") == 2
+
+
+def test_team_parent_sets_team_id():
+    """When parent is a Team, team_id is set on the subagent."""
+    from agno.agent.agent import Agent
+    from agno.team.team import Team
+
+    captured: dict = {}
+
+    def fake_agent_init(*args: object, **kwargs: object) -> MagicMock:
+        captured.update(kwargs)
+        return MagicMock()
+
+    member = Agent(name="member")
+    team = Team(members=[member], name="my_team")
+    team.initialize_team()
+
+    config = SubAgentConfig()
+    toolkit = SubAgentToolkit(parent=team, config=config)
+
+    with patch("agno.agent.agent.Agent", side_effect=fake_agent_init):
+        toolkit._build_subagent(
+            role="specialist",
+            instructions="Specialize.",
+            tool_names=None,
+            expected_output=None,
+            model_override=None,
+        )
+
+    assert captured.get("team_id") == team.id
+
+
+def test_agent_parent_does_not_set_team_id():
+    """When parent is an Agent (not a Team), team_id is None on the subagent."""
+    from agno.agent.agent import Agent
+
+    captured: dict = {}
+
+    def fake_agent_init(*args: object, **kwargs: object) -> MagicMock:
+        captured.update(kwargs)
+        return MagicMock()
+
+    parent = Agent(name="solo_agent")
+    parent.initialize_agent()
+
+    config = SubAgentConfig()
+    toolkit = SubAgentToolkit(parent=parent, config=config)
+
+    with patch("agno.agent.agent.Agent", side_effect=fake_agent_init):
+        toolkit._build_subagent(
+            role="helper",
+            instructions="Help.",
+            tool_names=None,
+            expected_output=None,
+            model_override=None,
+        )
+
+    assert captured.get("team_id") is None
