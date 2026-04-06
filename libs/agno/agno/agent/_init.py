@@ -295,11 +295,13 @@ def register_subagents(agent: Agent) -> None:
 
     for sa in agent.subagents:
         if isinstance(sa, SubAgent):
-            toolkit.register(sa.make_sync_callable())   # → toolkit.functions
-            toolkit.register(sa.make_async_callable())  # → toolkit.async_functions
+            sa.validate(parent=agent)
+            toolkit.register(sa.make_sync_callable(parent=agent))  # → toolkit.functions
+            toolkit.register(sa.make_async_callable(parent=agent))  # → toolkit.async_functions
         elif isinstance(sa, AsyncSubAgent):
             assert manager is not None
-            toolkit.register(sa.make_launch_callable(manager))  # → async_functions only
+            sa.validate(parent=agent)
+            toolkit.register(sa.make_launch_callable(manager, parent=agent))  # → async_functions only
         else:
             log_warning(f"register_subagents: unknown subagent type {type(sa)}, skipping")
 

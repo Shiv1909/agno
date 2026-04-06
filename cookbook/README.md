@@ -60,6 +60,12 @@ Hundreds of examples. Copy, paste, run.
 ### Integrations
 [92_integrations](./92_integrations) — Connect to Discord, observability tools (Langfuse, Arize Phoenix, AgentOps, LangSmith), memory providers, and A2A protocol.
 
+### Backends & Sandboxes
+[94_backends](./94_backends) — Filesystem, shell, WSL, composite, and sandbox backends plus `BackendToolkit`.
+
+### Sub-Agents
+[95_subagents](./95_subagents) — Delegate from a parent agent to child `Agent` or `Team` targets with explicit context controls.
+
 ## Quality Standard
 
 For every cookbook folder that contains runnable Python examples, include:
