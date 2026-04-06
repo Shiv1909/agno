@@ -181,3 +181,43 @@ def test_subagent_toolkit_async_tool_description():
     props = async_fn.parameters.get("properties", {})
     for expected_param in ("role", "instructions", "task"):
         assert expected_param in props, f"Expected parameter '{expected_param}' missing from async spawn_agent schema"
+
+
+# ---------------------------------------------------------------------------
+# Agent integration tests
+# ---------------------------------------------------------------------------
+
+
+def test_agent_has_dynamic_subagent_fields():
+    """Agent accepts enable_dynamic_subagents and subagent_config."""
+    from agno.agent.agent import Agent
+
+    agent = Agent(name="test", enable_dynamic_subagents=False)
+    assert agent.enable_dynamic_subagents is False
+    assert agent.subagent_config is None
+
+
+def test_agent_wires_toolkit_when_enabled():
+    """SubAgentToolkit is added to agent.tools after initialize_agent runs."""
+    from agno.agent.agent import Agent
+
+    agent = Agent(name="test", enable_dynamic_subagents=True)
+    # initialize_agent is called lazily (on first run); invoke explicitly for testing
+    agent.initialize_agent()
+
+    toolkit_found = any(isinstance(t, SubAgentToolkit) for t in (agent.tools or []))
+    assert toolkit_found, "SubAgentToolkit should be in agent.tools when enable_dynamic_subagents=True"
+
+
+def test_agent_wires_toolkit_with_custom_config():
+    """Custom SubAgentConfig is threaded through to the toolkit."""
+    from agno.agent.agent import Agent
+
+    config = SubAgentConfig(markdown=True, max_concurrent=2)
+    agent = Agent(name="test", enable_dynamic_subagents=True, subagent_config=config)
+    agent.initialize_agent()
+
+    toolkit = next((t for t in (agent.tools or []) if isinstance(t, SubAgentToolkit)), None)
+    assert toolkit is not None
+    assert toolkit._config.markdown is True
+    assert toolkit._config.max_concurrent == 2

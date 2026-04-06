@@ -237,6 +237,25 @@ def get_models(agent: Agent) -> None:
         agent.compression_manager.model = agent.model
 
 
+def set_dynamic_subagents(agent: "Agent") -> None:
+    """Append SubAgentToolkit to agent.tools when enable_dynamic_subagents is True."""
+    if not agent.enable_dynamic_subagents:
+        return
+
+    from agno.agent.subagent import SubAgentConfig, SubAgentToolkit
+
+    config = agent.subagent_config or SubAgentConfig()
+    toolkit = SubAgentToolkit(parent=agent, config=config)
+
+    if isinstance(agent.tools, list):
+        agent.tools.append(toolkit)
+    else:
+        log_warning(
+            "enable_dynamic_subagents=True is not supported when tools is a callable factory. "
+            "Pass tools as a list instead."
+        )
+
+
 def initialize_agent(agent: Agent, debug_mode: Optional[bool] = None) -> None:
     set_default_model(agent)
     set_debug(agent, debug_mode=debug_mode)
@@ -257,6 +276,8 @@ def initialize_agent(agent: Agent, debug_mode: Optional[bool] = None) -> None:
         set_compression_manager(agent)
     if agent.learning is not None and agent.learning is not False:
         set_learning_machine(agent)
+    if agent.enable_dynamic_subagents:
+        set_dynamic_subagents(agent)
 
     log_debug(f"Agent ID: {agent.id}", center=True)
 

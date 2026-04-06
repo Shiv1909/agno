@@ -61,6 +61,7 @@ from agno.session.summary import SessionSummary
 from agno.skills import Skills
 from agno.tools import Toolkit
 from agno.tools.function import Function
+from agno.agent.subagent import SubAgentConfig
 from agno.utils.log import log_warning
 from agno.utils.safe_formatter import SafeFormatter
 
@@ -338,6 +339,12 @@ class Agent:
     # Metadata stored with this agent
     metadata: Optional[Dict[str, Any]] = None
 
+    # --- Dynamic Subagents ---
+    # If True, the agent gains a spawn_agent tool it can call to create ephemeral subagents mid-run
+    enable_dynamic_subagents: bool = False
+    # Configuration template for spawned subagents. Uses sensible defaults when None.
+    subagent_config: Optional[SubAgentConfig] = None
+
     # --- Experimental Features ---
     # --- Agent Culture ---
     # Culture manager to use for this agent
@@ -491,6 +498,8 @@ class Agent:
         cache_callables: bool = True,
         callable_tools_cache_key: Optional[Callable[..., Optional[str]]] = None,
         callable_knowledge_cache_key: Optional[Callable[..., Optional[str]]] = None,
+        enable_dynamic_subagents: bool = False,
+        subagent_config: Optional[SubAgentConfig] = None,
     ):
         self.model = model  # type: ignore[assignment]
         if fallback_config is not None:
@@ -667,6 +676,9 @@ class Agent:
         self.enable_agentic_culture = enable_agentic_culture
         self.update_cultural_knowledge = update_cultural_knowledge
         self.add_culture_to_context = add_culture_to_context
+
+        self.enable_dynamic_subagents = enable_dynamic_subagents
+        self.subagent_config = subagent_config
 
         self.debug_mode = debug_mode
         if debug_level not in [1, 2]:
