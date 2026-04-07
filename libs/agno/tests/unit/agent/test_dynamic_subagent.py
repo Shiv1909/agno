@@ -421,6 +421,31 @@ async def test_aspawn_agent_does_not_pass_session_state_to_run():
 # ---------------------------------------------------------------------------
 
 
+def test_build_subagent_does_not_clear_template_tools_when_no_resolution():
+    """When _resolve_tools returns None, the tools key must be absent from deep_copy update."""
+    mock_agent = _make_mock_agent()
+    captured = _capture_deep_copy_update(mock_agent)
+
+    parent = MagicMock(spec=["model", "tools", "knowledge", "session_state", "id", "name", "metadata", "subagent_template"])
+    parent.model = None
+    parent.tools = []  # no parent tools to delegate
+    parent.knowledge = None
+    parent.session_state = None
+    parent.id = "p"
+    parent.name = "p"
+    parent.metadata = {}
+    parent.subagent_template = mock_agent  # template has its own tools
+
+    config = SubAgentConfig(inherit_parent_tools=False, allow_tool_selection=False)
+    toolkit = SubAgentToolkit(parent=parent, config=config)
+
+    with patch("agno.agent.agent.Agent", return_value=mock_agent):
+        toolkit._build_subagent("r", "i", None, None, None, "t")
+
+    # "tools" key must NOT be in the update dict — template keeps its own tools
+    assert "tools" not in captured, f"tools key should be absent, got: {captured.get('tools')}"
+
+
 def test_resolve_tools_whitelist_filtering():
     """_resolve_tools includes a toolkit when at least one function is in allowed_tools."""
     from agno.tools import Toolkit as _Toolkit
