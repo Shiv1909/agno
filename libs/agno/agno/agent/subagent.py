@@ -443,4 +443,17 @@ class SubAgentToolkit(Toolkit):
         state = getattr(self._parent, "session_state", None)
         if not state:
             return None
-        return "Parent session state (read-only):\n" + json.dumps(state, indent=2, default=str)
+        _warned = False
+
+        def _default_serializer(obj: object) -> str:
+            nonlocal _warned
+            if not _warned:
+                log_warning(
+                    f"session_state contains non-serializable value(s); "
+                    f"they will be converted to strings. "
+                    f"First non-serializable type: {type(obj).__name__}"
+                )
+                _warned = True
+            return str(obj)
+
+        return "Parent session state (read-only):\n" + json.dumps(state, indent=2, default=_default_serializer)

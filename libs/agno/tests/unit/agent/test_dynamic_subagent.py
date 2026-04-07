@@ -399,6 +399,23 @@ def test_spawn_agent_handles_subagent_exception():
     assert "model unavailable" in result
 
 
+def test_build_additional_context_warns_on_non_serializable():
+    """_build_additional_context emits a log_warning when session_state has non-serializable values."""
+    parent = MagicMock(spec=["model", "tools", "knowledge", "session_state", "id", "name", "metadata", "subagent_template"])
+    parent.session_state = {"connection": object()}  # not JSON-serializable
+
+    config = SubAgentConfig(inject_session_state=True)
+    toolkit = SubAgentToolkit(parent=parent, config=config)
+
+    with patch("agno.agent.subagent.log_warning") as mock_warn:
+        ctx = toolkit._build_additional_context()
+
+    assert ctx is not None
+    mock_warn.assert_called_once()
+    warning_msg = mock_warn.call_args[0][0].lower()
+    assert "non-serializable" in warning_msg
+
+
 def test_build_additional_context_injects_session_state():
     """_build_additional_context embeds parent session_state as JSON when inject_session_state=True."""
     parent = MagicMock()
