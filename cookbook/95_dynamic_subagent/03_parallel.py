@@ -24,7 +24,6 @@ agent = Agent(
     enable_dynamic_subagents=True,
     subagent_config=SubAgentConfig(
         max_concurrent=5,
-        markdown=True,
     ),
     markdown=True,
 )

@@ -28,7 +28,6 @@ agent = Agent(
     subagent_config=SubAgentConfig(
         allowed_tools=["search"],
         allow_tool_selection=True,
-        markdown=True,
     ),
     markdown=True,
 )

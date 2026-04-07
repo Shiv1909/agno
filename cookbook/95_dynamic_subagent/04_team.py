@@ -30,7 +30,6 @@ team = Team(
     enable_dynamic_subagents=True,
     subagent_config=SubAgentConfig(
         inject_session_state=True,
-        markdown=True,
     ),
     markdown=True,
 )

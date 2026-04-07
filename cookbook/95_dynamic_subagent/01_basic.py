@@ -20,9 +20,7 @@ agent = Agent(
         "Pass all relevant facts to the specialist's task.",
     ],
     enable_dynamic_subagents=True,
-    subagent_config=SubAgentConfig(
-        markdown=True,
-    ),
+    subagent_config=SubAgentConfig(),
     markdown=True,
 )
 
