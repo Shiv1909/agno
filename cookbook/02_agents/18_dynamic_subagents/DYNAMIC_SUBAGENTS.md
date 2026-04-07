@@ -96,12 +96,17 @@ SubAgentConfig(
     # ── Model tier selection ─────────────────────────────────────────
     model_tiers=None,             # {"fast": "gpt-4o-mini", "standard": "gpt-4o", ...}
     allow_model_tier_selection=False,  # expose model_tier param to the LLM
+    tier_hints=None,              # {tier_label: usage hint} shown to LLM; merged with defaults
 
     # ── Context injection ────────────────────────────────────────────
     inject_session_state=False,   # embed parent session_state as read-only JSON
 
     # ── Concurrency ──────────────────────────────────────────────────
     max_concurrent=5,             # enforced via threading + asyncio semaphore
+
+    # ── Observability ────────────────────────────────────────────────
+    log_subagent_runs=True,       # log spawn + completion lines (role, tokens, duration, depth)
+    show_subagent_output=False,   # print subagent's full response to stdout (dev/debug only)
 )
 ```
 
@@ -280,7 +285,7 @@ SubAgentConfig(max_concurrent=3)  # at most 3 subagents at any moment
 
 ### New: `agno/agent/subagent.py`
 
-- **`SubAgentConfig`** (8 policy fields, down from 25+): `inherit_parent_tools`, `allowed_tools`, `allow_tool_selection`, `context_heavy_tools`, `model_tiers`, `allow_model_tier_selection`, `inject_session_state`, `max_concurrent`
+- **`SubAgentConfig`** (10 policy fields): `inherit_parent_tools`, `allowed_tools`, `allow_tool_selection`, `context_heavy_tools`, `model_tiers`, `allow_model_tier_selection`, `tier_hints`, `inject_session_state`, `max_concurrent`, `log_subagent_runs`, `show_subagent_output`
 - **`SubAgentToolkit`**: uses `template.deep_copy(update={...})` instead of manual `Agent(...)` constructor; adds `threading.Semaphore` + `asyncio.Semaphore` for real concurrency enforcement; `build_guidance()` generates system-prompt injection; `spawn_agent` / `aspawn_agent` gain `model_tier` parameter; `spawn_task` in metadata now records the actual *task* string, not instructions
 
 ### Modified: `agno/agent/agent.py`

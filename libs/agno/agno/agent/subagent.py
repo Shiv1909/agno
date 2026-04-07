@@ -192,7 +192,9 @@ class SubAgentToolkit(Toolkit):
             expected_output: Optional description of the desired output format.
             model_tier: Optional tier name (e.g. ``"fast"``, ``"standard"``,
                         ``"powerful"``) as defined in ``SubAgentConfig.model_tiers``.
-                        Only available when ``allow_model_tier_selection=True``.
+                        Has no effect unless ``SubAgentConfig.allow_model_tier_selection=True``
+                        and the tier name exists in ``SubAgentConfig.model_tiers``; otherwise
+                        the template model is used and this parameter is silently ignored.
 
         Returns:
             The string content returned by the subagent, or a fallback message.
@@ -250,6 +252,9 @@ class SubAgentToolkit(Toolkit):
             tools: Optional list of parent-tool names to give this subagent.
             expected_output: Optional description of the desired output format.
             model_tier: Optional tier name as defined in ``SubAgentConfig.model_tiers``.
+                        Has no effect unless ``SubAgentConfig.allow_model_tier_selection=True``
+                        and the tier name exists in ``SubAgentConfig.model_tiers``; otherwise
+                        the template model is used and this parameter is silently ignored.
 
         Returns:
             The string content returned by the subagent, or a fallback message.
@@ -390,6 +395,10 @@ class SubAgentToolkit(Toolkit):
         log_debug(f"Spawning subagent | parent={parent_name}({parent_id}) role={role!r} depth={spawn_depth}")
 
         # ── Build via deep_copy — preserves all template config ───────────────
+        # NOTE: team_id is intentionally excluded from the update dict.
+        # It is a dataclass field on Agent but NOT a parameter in Agent.__init__,
+        # so passing it via deep_copy(update={...}) would raise TypeError.
+        # It is set directly on the subagent after construction instead.
         update: dict = {
             "name": role,
             "description": f"Ephemeral subagent: {role}",
@@ -405,7 +414,6 @@ class SubAgentToolkit(Toolkit):
             # Subagent should not spawn further subagents (prevents recursion)
             "enable_dynamic_subagents": False,
             # Lineage
-            "team_id": team_id,
             "metadata": {
                 "spawned_by_agent_id": parent_id,
                 "spawned_by_agent_name": parent_name,
@@ -418,7 +426,12 @@ class SubAgentToolkit(Toolkit):
         # None means "keep whatever the template already has configured".
         if resolved_tools is not None:
             update["tools"] = resolved_tools
-        return template.deep_copy(update=update)
+        subagent = template.deep_copy(update=update)
+        # Set team_id after construction — it is a dataclass field that is
+        # assigned externally, not accepted by Agent.__init__.
+        if team_id is not None:
+            subagent.team_id = team_id
+        return subagent
 
     def _resolve_model(self, model_tier: Optional[str], template: "Agent") -> Any:
         """Resolve the model for the spawned subagent.

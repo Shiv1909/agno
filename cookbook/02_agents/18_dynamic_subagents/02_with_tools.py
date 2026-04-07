@@ -19,7 +19,6 @@ Prompts to try:
 
 from agno.agent import Agent, SubAgentConfig
 from agno.models.openai import OpenAIChat
-from agno.team import Team
 from agno.tools.duckduckgo import DuckDuckGoTools
 
 # ---------------------------------------------------------------------------

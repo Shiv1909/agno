@@ -1,61 +1,97 @@
 # dynamic_subagent — Test Log
 
+> **Environment:** Azure OpenAI (`gpt-4o` deployment, endpoint `mss-azureopenai.openai.azure.com`).
+> Cookbooks that use `DuckDuckGoTools` (02, 03, 04) require `ddgs` (`pip install ddgs`).
+> Run with: `PYTHONIOENCODING=utf-8 .venvs/demo/bin/python cookbook/02_agents/18_dynamic_subagents/<file>.py`
+
+---
+
 ### 01_basic.py
 
-**Status:** NOT RUN
+**Status:** PASS
 
-**Description:** Orchestrator spawns a writing specialist for two independent tasks. The LLM decides to use spawn_agent without any developer-side routing code.
+**Description:** Orchestrator with `enable_dynamic_subagents=True` and no `SubAgentConfig`.
+The LLM decided on its own to use `spawn_agent` for two independent writing subtasks
+(poem + history explanation). The orchestrator's response contained only the final
+combined answer — no intermediate tool outputs visible in the parent context.
 
-**Result:** Awaiting test run with live API key.
+**Result:** Agent ran in ~10s. Lifecycle logs showed spawn + completion with token counts.
+Context isolation confirmed — parent context contained only the final answer.
 
 ---
 
 ### 02_with_tools.py
 
-**Status:** NOT RUN
+**Status:** PASS
 
-**Description:** Orchestrator delegates DuckDuckGo search tools to subagents via a whitelist. Subagent tool outputs stay isolated; the orchestrator only receives final summaries.
+**Description:** Orchestrator delegates `DuckDuckGoTools` to subagents via `allowed_tools`
+whitelist (`["duckduckgo_search", "duckduckgo_news"]`). Two subagents were spawned — one
+for quantum computing research, one for AI safety news. Each subagent ran web searches
+internally; the orchestrator received only the summaries.
 
-**Result:** Awaiting test run with live API key.
+**Result:** Agent ran in ~5s. Tool whitelist filtering worked — subagents received only
+the permitted functions, not the full toolkit. Combined summary returned correctly.
 
 ---
 
 ### 03_parallel.py
 
-**Status:** NOT RUN
+**Status:** PASS
 
-**Description:** Three async subagents spawned concurrently in one LLM turn. Uses aprint_response with max_concurrent=3.
+**Description:** Three async subagents spawned concurrently in a single LLM turn via
+`aprint_response`. Subagents researched Python 3.13 features, latest Rust release notes,
+and WebAssembly news in parallel. All three ran within `max_concurrent=3`.
 
-**Result:** Awaiting test run with live API key.
+**Result:** Agent ran in ~75s (web searches). All three subagents spawned and completed
+concurrently — lifecycle logs confirmed simultaneous spawning. Orchestrator combined
+the three research summaries into a single coherent response.
 
 ---
 
 ### 04_team.py
 
-**Status:** NOT RUN
+**Status:** PASS
 
-**Description:** Team leader spawns subagents alongside registered members. Spawned subagents carry team_id in metadata for session-level observability.
+**Description:** A `Team` with `enable_dynamic_subagents=True` alongside registered
+`researcher` and `writer` members. Team leader spawned a subagent to handle heavy
+data-fetching; permanent members handled the writing task.
 
-**Result:** Awaiting test run with live API key.
+**Result:** Team ran in ~9.5s. Spawned subagent correctly carried `team_id` in metadata
+(confirmed via lifecycle logs at `depth=1`). Team leader's context stayed clean — only
+the subagent's summary entered the team conversation, not the raw web results.
 
 ---
 
 ### 05_model_tiers.py
 
-**Status:** NOT RUN
+**Status:** PASS
 
-**Description:** Cost-aware orchestrator selects model tier per subtask. LLM picks fast/standard/powerful labels; developer controls the model-ID mapping.
+**Description:** Cost-aware orchestrator with three tiers (`fast → gpt-4o-mini`,
+`standard → gpt-4o`, `powerful → o3-mini`). LLM routed simple number extraction to
+`fast`, paragraph explanation to `standard`, and architecture trade-off analysis to
+`powerful`. In this test environment all tiers resolved to the same Azure `gpt-4o`
+deployment (only one deployment configured); tier selection logic and guidance injection
+worked correctly regardless.
 
-**Result:** Awaiting test run with live API key.
+**Result:** Agent ran in ~16s. LLM correctly selected tier labels per task type.
+`model_tier` routing through `_resolve_model` confirmed in lifecycle logs. Tier guidance
+visible in spawned subagent `instructions`.
 
 ---
 
 ### 06_context_isolation.py
 
-**Status:** NOT RUN
+**Status:** PASS
 
-**Description:** Customer support scenario with mock DB and knowledge base tools. Large payloads are delegated via spawn_agent; orchestrator context only sees short summaries.
+**Description:** Customer support scenario with mock `CustomerDataTools` (returns 50-order
+JSON blob) and `KnowledgeBaseTools` (returns multi-section policy article). Both tools
+are registered on `context_heavy_tools` so the orchestrator is guided to always route
+them through `spawn_agent`.
 
-**Result:** Awaiting test run with live API key.
+**Result:** Agent ran in ~27s. Orchestrator spawned two subagents — one for order lookup,
+one for policy search. Each subagent processed the large tool payload internally;
+the orchestrator's context only received two short summaries (~50 tokens each) instead
+of the full JSON and policy article. Final response correctly combined order details
+with return policy instructions.
 
 ---

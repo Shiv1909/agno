@@ -230,7 +230,7 @@ def test_toolkit_registers_both_sync_and_async_spawn():
 
 
 def test_guidance_injected_into_agent_instructions():
-    """set_dynamic_subagents appends guidance to agent.instructions."""
+    """set_dynamic_subagents appends guidance to agent.instructions (None → str)."""
     from agno.agent.agent import Agent
 
     agent = Agent(name="test", enable_dynamic_subagents=True)
@@ -239,6 +239,39 @@ def test_guidance_injected_into_agent_instructions():
     assert agent.instructions is not None
     assert "spawn_agent" in str(agent.instructions)
     assert "Dynamic Subagent Guidance" in str(agent.instructions)
+
+
+def test_guidance_injected_into_str_instructions():
+    """set_dynamic_subagents appends guidance after existing str instructions."""
+    from agno.agent.agent import Agent
+
+    original = "You are a helpful assistant."
+    agent = Agent(name="test", instructions=original, enable_dynamic_subagents=True)
+    agent.initialize_agent()
+
+    assert isinstance(agent.instructions, str)
+    # Original instructions must be preserved at the start
+    assert agent.instructions.startswith(original)
+    # Guidance must be appended after
+    assert "Dynamic Subagent Guidance" in agent.instructions
+    assert agent.instructions.index(original) < agent.instructions.index("Dynamic Subagent Guidance")
+
+
+def test_guidance_injected_into_list_instructions():
+    """set_dynamic_subagents appends guidance as final element of list instructions."""
+    from agno.agent.agent import Agent
+
+    original = ["You are a helpful assistant.", "Always be concise."]
+    agent = Agent(name="test", instructions=original, enable_dynamic_subagents=True)
+    agent.initialize_agent()
+
+    assert isinstance(agent.instructions, list)
+    # Original messages must be preserved
+    assert agent.instructions[0] == original[0]
+    assert agent.instructions[1] == original[1]
+    # Guidance must be the last element
+    last = agent.instructions[-1]
+    assert "Dynamic Subagent Guidance" in str(last)
 
 
 # ---------------------------------------------------------------------------
@@ -832,7 +865,11 @@ def test_subagent_recursion_disabled():
 
 
 def test_team_parent_sets_team_id():
-    """When parent is a Team, team_id is set on the subagent."""
+    """When parent is a Team, team_id is set directly on the spawned subagent.
+
+    team_id is NOT in the deep_copy update dict — Agent.__init__ does not
+    accept it. It is assigned to the subagent attribute after construction.
+    """
     from agno.agent.agent import Agent
     from agno.team.team import Team
 
@@ -846,13 +883,16 @@ def test_team_parent_sets_team_id():
     captured = _capture_deep_copy_update(mock_agent)
 
     with patch("agno.agent.agent.Agent", return_value=mock_agent):
-        toolkit._build_subagent("specialist", "Specialize.", None, None, None, "task")
+        subagent = toolkit._build_subagent("specialist", "Specialize.", None, None, None, "task")
 
-    assert captured.get("team_id") == team.id
+    # team_id must NOT be in the deep_copy update dict (would crash Agent.__init__)
+    assert "team_id" not in captured, "team_id must not be in deep_copy update — Agent.__init__ rejects it"
+    # team_id must be set on the subagent directly after construction
+    assert subagent.team_id == team.id
 
 
 def test_agent_parent_does_not_set_team_id():
-    """When parent is an Agent (not a Team), team_id is None on the subagent."""
+    """When parent is a plain Agent (not a Team), team_id is not set on the subagent."""
     from agno.agent.agent import Agent
 
     parent = Agent(name="solo_agent")
@@ -866,7 +906,8 @@ def test_agent_parent_does_not_set_team_id():
     with patch("agno.agent.agent.Agent", return_value=mock_agent):
         toolkit._build_subagent("helper", "Help.", None, None, None, "task")
 
-    assert captured.get("team_id") is None
+    # team_id must not be in the deep_copy update dict for a plain-Agent parent
+    assert "team_id" not in captured
 
 
 # ---------------------------------------------------------------------------

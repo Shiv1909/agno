@@ -552,7 +552,7 @@ class Team:
         callable_knowledge_cache_key: Optional[Callable[..., Optional[str]]] = None,
         callable_members_cache_key: Optional[Callable[..., Optional[str]]] = None,
         enable_dynamic_subagents: bool = False,
-        subagent_template: Optional[Any] = None,
+        subagent_template: Optional[Agent] = None,
         subagent_config: Optional[SubAgentConfig] = None,
     ):
         _init.__init__(
