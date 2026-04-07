@@ -415,9 +415,12 @@ class SubAgentToolkit(Toolkit):
 
         for tool in parent_tools:
             if isinstance(tool, _Toolkit):
-                # Include the whole toolkit if any of its functions are permitted
-                if any(fn in permitted for fn in tool.functions):
-                    result.append(tool)
+                # Extract only the individually-permitted Function objects.
+                # Never delegate the entire toolkit — that would bypass the whitelist
+                # by giving the subagent functions the caller never requested.
+                for fn_name, fn_obj in tool.functions.items():
+                    if fn_name in permitted:
+                        result.append(fn_obj)
             elif isinstance(tool, _Function):
                 if tool.name in permitted:
                     result.append(tool)

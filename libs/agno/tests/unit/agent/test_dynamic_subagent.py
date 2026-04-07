@@ -529,30 +529,85 @@ def test_build_subagent_does_not_clear_template_tools_when_no_resolution():
 
 
 def test_resolve_tools_whitelist_filtering():
-    """_resolve_tools includes a toolkit when at least one function is in allowed_tools."""
+    """_resolve_tools includes only whitelisted Function objects, not the whole toolkit."""
     from agno.tools import Toolkit as _Toolkit
+    from agno.tools.function import Function
+
+    do_search_fn = MagicMock(spec=Function)
+    do_search_fn.name = "do_search"
+    do_write_fn = MagicMock(spec=Function)
+    do_write_fn.name = "do_write"
 
     class FakeToolkit(_Toolkit):
         def __init__(self) -> None:
             super().__init__(name="fake")
-            self.functions["do_search"] = MagicMock()
-            self.functions["do_write"] = MagicMock()
+            self.functions["do_search"] = do_search_fn
+            self.functions["do_write"] = do_write_fn
 
     fake_tk = FakeToolkit()
 
-    parent = MagicMock()
+    parent = MagicMock(spec=["model", "tools", "knowledge", "session_state", "id", "name", "metadata", "subagent_template"])
     parent.model = None
     parent.tools = [fake_tk]
     parent.knowledge = None
     parent.session_state = None
     parent.id = "parent-id"
+    parent.name = "p"
+    parent.metadata = {}
     parent.subagent_template = None
 
     config = SubAgentConfig(allowed_tools=["do_search"])
     toolkit = SubAgentToolkit(parent=parent, config=config)
 
     resolved = toolkit._resolve_tools(["do_search", "do_write"], template_tools=None)
-    assert fake_tk in resolved, "FakeToolkit should be included because do_search is in allowed_tools"
+    assert resolved is not None
+    # The whole toolkit must NOT be delegated
+    assert fake_tk not in resolved, "Full toolkit must not be delegated — only permitted functions"
+    # Only the permitted Function must be present
+    assert do_search_fn in resolved, "do_search Function must be present"
+    assert do_write_fn not in resolved, "do_write must be excluded since it was not in allowed_tools"
+
+
+def test_resolve_tools_whitelist_does_not_leak_unrequested_functions():
+    """When a toolkit has 3 functions and only 1 is whitelisted, only that 1 is delegated."""
+    from agno.tools import Toolkit as _Toolkit
+    from agno.tools.function import Function
+
+    search_fn = MagicMock(spec=Function)
+    search_fn.name = "search"
+    image_fn = MagicMock(spec=Function)
+    image_fn.name = "image_search"
+    news_fn = MagicMock(spec=Function)
+    news_fn.name = "news_search"
+
+    class MultiTool(_Toolkit):
+        def __init__(self) -> None:
+            super().__init__(name="multi")
+            self.functions["search"] = search_fn
+            self.functions["image_search"] = image_fn
+            self.functions["news_search"] = news_fn
+
+    multi = MultiTool()
+
+    parent = MagicMock(spec=["model", "tools", "knowledge", "session_state", "id", "name", "metadata", "subagent_template"])
+    parent.model = None
+    parent.tools = [multi]
+    parent.knowledge = None
+    parent.session_state = None
+    parent.id = "parent-id"
+    parent.name = "p"
+    parent.metadata = {}
+    parent.subagent_template = None
+
+    config = SubAgentConfig(allowed_tools=["search"], allow_tool_selection=True)
+    toolkit = SubAgentToolkit(parent=parent, config=config)
+
+    resolved = toolkit._resolve_tools(["search"], template_tools=None)
+    assert resolved is not None
+    assert multi not in resolved
+    assert search_fn in resolved
+    assert image_fn not in resolved
+    assert news_fn not in resolved
 
 
 def test_resolve_tools_inherit_parent():
