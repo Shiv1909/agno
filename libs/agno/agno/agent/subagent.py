@@ -133,6 +133,7 @@ class SubAgentToolkit(Toolkit):
         # Semaphores are created lazily to respect event-loop lifecycle for async
         self._sync_semaphore = threading.Semaphore(config.max_concurrent)
         self._async_semaphore: Optional[asyncio.Semaphore] = None
+        self._async_semaphore_lock: asyncio.Lock = asyncio.Lock()
 
         super().__init__(
             name="subagent",
@@ -202,7 +203,7 @@ class SubAgentToolkit(Toolkit):
         Returns:
             The string content returned by the subagent, or a fallback message.
         """
-        async with self._get_async_semaphore():
+        async with await self._get_async_semaphore():
             subagent = self._build_subagent(role, instructions, tools, expected_output, model_tier, task)
             result = await subagent.arun(input=task, stream=False)
         if result and result.content:
@@ -266,10 +267,16 @@ class SubAgentToolkit(Toolkit):
     # Internal helpers
     # ──────────────────────────────────────────────────────────────────────────
 
-    def _get_async_semaphore(self) -> asyncio.Semaphore:
-        """Lazily create the async semaphore inside the running event loop."""
+    async def _get_async_semaphore(self) -> asyncio.Semaphore:
+        """Lazily create the async semaphore inside the running event loop.
+
+        Uses double-checked locking to be safe when multiple coroutines
+        enter aspawn_agent concurrently before the semaphore is initialized.
+        """
         if self._async_semaphore is None:
-            self._async_semaphore = asyncio.Semaphore(self._config.max_concurrent)
+            async with self._async_semaphore_lock:
+                if self._async_semaphore is None:
+                    self._async_semaphore = asyncio.Semaphore(self._config.max_concurrent)
         return self._async_semaphore
 
     def _build_subagent(

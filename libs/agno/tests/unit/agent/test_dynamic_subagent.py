@@ -317,6 +317,43 @@ async def test_aspawn_agent_no_content_returns_fallback():
     assert answer == "Subagent completed with no output."
 
 
+@pytest.mark.asyncio
+async def test_async_semaphore_single_instance():
+    """Concurrent aspawn_agent calls must share ONE semaphore, not create duplicates."""
+    import asyncio
+
+    mock_agent = _make_mock_agent(content="ok")
+    parent = MagicMock(spec=["model", "tools", "knowledge", "session_state", "id", "name", "metadata", "subagent_template"])
+    parent.model = None
+    parent.tools = []
+    parent.knowledge = None
+    parent.session_state = None
+    parent.id = "p"
+    parent.name = "p"
+    parent.metadata = {}
+    parent.subagent_template = mock_agent
+
+    config = SubAgentConfig(max_concurrent=2)
+    toolkit = SubAgentToolkit(parent=parent, config=config)
+
+    semaphores_seen: list = []
+    original_get = toolkit._get_async_semaphore
+
+    async def tracking_get() -> asyncio.Semaphore:
+        sem = await original_get()
+        semaphores_seen.append(id(sem))
+        return sem
+
+    toolkit._get_async_semaphore = tracking_get  # type: ignore
+
+    await asyncio.gather(
+        toolkit.aspawn_agent(role="r1", instructions="i", task="t1"),
+        toolkit.aspawn_agent(role="r2", instructions="i", task="t2"),
+    )
+
+    assert len(set(semaphores_seen)) == 1, "Multiple semaphore objects created — race condition!"
+
+
 def test_build_additional_context_injects_session_state():
     """_build_additional_context embeds parent session_state as JSON when inject_session_state=True."""
     parent = MagicMock()
