@@ -5,7 +5,7 @@ The parent agent has a DuckDuckGo search tool.
 It spawns a subagent that is allowed to use search too.
 
 Run:
-    python cookbook/agents/dynamic_subagent/02_with_tools.py
+    python cookbook/95_dynamic_subagent/02_with_tools.py
 
 Requirements:
     pip install duckduckgo-search

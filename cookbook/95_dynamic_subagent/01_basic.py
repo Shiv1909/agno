@@ -5,7 +5,7 @@ The researcher agent decides mid-run that it needs a specialist
 to write a formal summary. It spawns one on the spot.
 
 Run:
-    python cookbook/agents/dynamic_subagent/01_basic.py
+    python cookbook/95_dynamic_subagent/01_basic.py
 """
 
 from agno.agent import Agent, SubAgentConfig

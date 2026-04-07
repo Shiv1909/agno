@@ -5,7 +5,7 @@ The orchestrator spawns three specialists in parallel (one LLM turn,
 three concurrent tool calls). Results arrive together.
 
 Run:
-    python cookbook/agents/dynamic_subagent/03_parallel.py
+    python cookbook/95_dynamic_subagent/03_parallel.py
 """
 
 from agno.agent import Agent, SubAgentConfig

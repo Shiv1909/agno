@@ -5,7 +5,7 @@ A team leader can spawn ephemeral subagents in addition to
 delegating to its registered members.
 
 Run:
-    python cookbook/agents/dynamic_subagent/04_team.py
+    python cookbook/95_dynamic_subagent/04_team.py
 """
 
 from agno.agent import Agent, SubAgentConfig
