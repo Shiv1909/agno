@@ -342,7 +342,9 @@ class Agent:
     # --- Dynamic Subagents ---
     # If True, the agent gains a spawn_agent tool it can call to create ephemeral subagents mid-run
     enable_dynamic_subagents: bool = False
-    # Configuration template for spawned subagents. Uses sensible defaults when None.
+    # Base Agent to deep-copy for every spawned subagent. Inherits parent model when None.
+    subagent_template: Optional[Agent] = None
+    # Spawn-time policy (tool delegation, model tiers, concurrency). Uses sensible defaults when None.
     subagent_config: Optional[SubAgentConfig] = None
 
     # --- Experimental Features ---
@@ -499,6 +501,7 @@ class Agent:
         callable_tools_cache_key: Optional[Callable[..., Optional[str]]] = None,
         callable_knowledge_cache_key: Optional[Callable[..., Optional[str]]] = None,
         enable_dynamic_subagents: bool = False,
+        subagent_template: Optional[Agent] = None,
         subagent_config: Optional[SubAgentConfig] = None,
     ):
         self.model = model  # type: ignore[assignment]
@@ -678,6 +681,7 @@ class Agent:
         self.add_culture_to_context = add_culture_to_context
 
         self.enable_dynamic_subagents = enable_dynamic_subagents
+        self.subagent_template = subagent_template
         self.subagent_config = subagent_config
 
         self.debug_mode = debug_mode

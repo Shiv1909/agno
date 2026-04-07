@@ -26,12 +26,13 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
+import time
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, ConfigDict
 
 from agno.tools import Toolkit
-from agno.utils.log import log_debug, log_warning
+from agno.utils.log import log_debug, log_info, log_warning
 
 if TYPE_CHECKING:
     from agno.agent.agent import Agent
@@ -125,6 +126,16 @@ class SubAgentConfig(BaseModel):
     """Maximum number of subagents running simultaneously.
     Enforced via a ``threading.Semaphore`` (sync) and ``asyncio.Semaphore`` (async)."""
 
+    # ── Observability ─────────────────────────────────────────────────────────
+    log_subagent_runs: bool = True
+    """Emit ``log_info`` when a subagent is spawned and when it completes.
+    Each line includes role, truncated task, spawn depth, token counts, and
+    elapsed time.  Set to ``False`` to suppress all lifecycle logs."""
+
+    show_subagent_output: bool = False
+    """Print the subagent's full response to stdout after it completes.
+    Useful during development and debugging.  Suppressed by default."""
+
 
 class SubAgentToolkit(Toolkit):
     """Registers ``spawn_agent`` and ``aspawn_agent`` as tools on a parent Agent or Team.
@@ -193,6 +204,10 @@ class SubAgentToolkit(Toolkit):
             as it will block the event loop.  Use ``aspawn_agent`` instead when
             running inside an async application.
         """
+        spawn_depth = (getattr(self._parent, "metadata", None) or {}).get("spawn_depth", 0) + 1
+        t0 = time.monotonic()
+        if self._config.log_subagent_runs:
+            log_info(f"Spawning subagent '{role}' | task={task[:80]!r} | depth={spawn_depth}")
         with self._sync_semaphore:
             subagent = self._build_subagent(role, instructions, tools, expected_output, model_tier, task)
             try:
@@ -200,6 +215,19 @@ class SubAgentToolkit(Toolkit):
             except Exception as e:
                 log_warning(f"Subagent '{role}' failed: {e}")
                 return f"Subagent '{role}' failed: {e}"
+        if self._config.log_subagent_runs:
+            duration = time.monotonic() - t0
+            m = result.metrics if result else None
+            token_str = (
+                f" | tokens={m.total_tokens} (in={m.input_tokens} out={m.output_tokens})"
+                if m and m.total_tokens
+                else ""
+            )
+            log_info(f"Subagent '{role}' completed{token_str} | duration={duration:.2f}s | depth={spawn_depth}")
+        if self._config.show_subagent_output and result and result.content:
+            print(f"\n--- Subagent: {role} ---")
+            print(result.content)
+            print(f"--- End Subagent: {role} ---\n")
         if result and result.content:
             return str(result.content)
         return "Subagent completed with no output."
@@ -226,6 +254,10 @@ class SubAgentToolkit(Toolkit):
         Returns:
             The string content returned by the subagent, or a fallback message.
         """
+        spawn_depth = (getattr(self._parent, "metadata", None) or {}).get("spawn_depth", 0) + 1
+        t0 = time.monotonic()
+        if self._config.log_subagent_runs:
+            log_info(f"Spawning subagent '{role}' | task={task[:80]!r} | depth={spawn_depth}")
         async with await self._get_async_semaphore():
             subagent = self._build_subagent(role, instructions, tools, expected_output, model_tier, task)
             try:
@@ -233,6 +265,19 @@ class SubAgentToolkit(Toolkit):
             except Exception as e:
                 log_warning(f"Subagent '{role}' failed: {e}")
                 return f"Subagent '{role}' failed: {e}"
+        if self._config.log_subagent_runs:
+            duration = time.monotonic() - t0
+            m = result.metrics if result else None
+            token_str = (
+                f" | tokens={m.total_tokens} (in={m.input_tokens} out={m.output_tokens})"
+                if m and m.total_tokens
+                else ""
+            )
+            log_info(f"Subagent '{role}' completed{token_str} | duration={duration:.2f}s | depth={spawn_depth}")
+        if self._config.show_subagent_output and result and result.content:
+            print(f"\n--- Subagent: {role} ---")
+            print(result.content)
+            print(f"--- End Subagent: {role} ---\n")
         if result and result.content:
             return str(result.content)
         return "Subagent completed with no output."

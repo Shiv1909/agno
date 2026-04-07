@@ -14,7 +14,7 @@ from agno.agent.subagent import SubAgentConfig, SubAgentToolkit
 
 
 def test_subagent_config_defaults():
-    """Verify all defaults match the spec (8 policy fields only)."""
+    """Verify all defaults match the spec (10 policy fields)."""
     cfg = SubAgentConfig()
 
     # Tool delegation
@@ -32,6 +32,10 @@ def test_subagent_config_defaults():
 
     # Concurrency
     assert cfg.max_concurrent == 5
+
+    # Observability
+    assert cfg.log_subagent_runs is True
+    assert cfg.show_subagent_output is False
 
 
 def test_subagent_config_accepts_policy_fields():
@@ -340,6 +344,7 @@ def _make_mock_agent(content: object = "ok") -> MagicMock:
     agent_mock = MagicMock()
     result_mock = MagicMock()
     result_mock.content = content
+    result_mock.metrics = None  # explicit None — prevents MagicMock auto-attr polluting log assertions
     agent_mock.arun = AsyncMock(return_value=result_mock)
     agent_mock.run = MagicMock(return_value=result_mock)
     # _build_subagent calls template.deep_copy(update={...}) — return self so
@@ -862,3 +867,63 @@ def test_agent_parent_does_not_set_team_id():
         toolkit._build_subagent("helper", "Help.", None, None, None, "task")
 
     assert captured.get("team_id") is None
+
+
+# ---------------------------------------------------------------------------
+# Phase 1 — Lifecycle visibility tests
+# ---------------------------------------------------------------------------
+
+
+def test_log_subagent_runs_true_emits_spawn_and_completion():
+    """When log_subagent_runs=True (default), log_info is called for spawn and completion."""
+    mock_agent = _make_mock_agent(content="result")
+    toolkit = _make_toolkit(subagent_template=mock_agent)
+
+    with patch("agno.agent.subagent.log_info") as mock_log:
+        toolkit.spawn_agent(role="analyst", instructions="analyse", task="Count the rows")
+
+    assert mock_log.call_count == 2, f"Expected 2 log_info calls, got {mock_log.call_count}"
+    spawn_msg = mock_log.call_args_list[0][0][0]
+    done_msg = mock_log.call_args_list[1][0][0]
+    assert "analyst" in spawn_msg and "Spawning" in spawn_msg
+    assert "depth=1" in spawn_msg
+    assert "analyst" in done_msg and "completed" in done_msg
+    assert "depth=1" in done_msg
+
+
+def test_log_subagent_runs_false_no_log_info():
+    """When log_subagent_runs=False, log_info is never called by the spawn path."""
+    mock_agent = _make_mock_agent(content="result")
+    parent = _make_parent_mock(subagent_template=mock_agent)
+    toolkit = SubAgentToolkit(parent=parent, config=SubAgentConfig(log_subagent_runs=False))
+
+    with patch("agno.agent.subagent.log_info") as mock_log:
+        toolkit.spawn_agent(role="analyst", instructions="analyse", task="Count the rows")
+
+    mock_log.assert_not_called()
+
+
+def test_show_subagent_output_true_prints_to_stdout(capsys):
+    """When show_subagent_output=True, the subagent's content is printed to stdout."""
+    mock_agent = _make_mock_agent(content="Here is my answer")
+    parent = _make_parent_mock(subagent_template=mock_agent)
+    toolkit = SubAgentToolkit(parent=parent, config=SubAgentConfig(show_subagent_output=True))
+
+    with patch("agno.agent.subagent.log_info"):
+        toolkit.spawn_agent(role="writer", instructions="write", task="Write a haiku")
+
+    captured = capsys.readouterr()
+    assert "writer" in captured.out
+    assert "Here is my answer" in captured.out
+
+
+def test_show_subagent_output_false_no_stdout(capsys):
+    """When show_subagent_output=False (default), nothing is printed to stdout."""
+    mock_agent = _make_mock_agent(content="Here is my answer")
+    toolkit = _make_toolkit(subagent_template=mock_agent)
+
+    with patch("agno.agent.subagent.log_info"):
+        toolkit.spawn_agent(role="writer", instructions="write", task="Write a haiku")
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
