@@ -354,6 +354,51 @@ async def test_async_semaphore_single_instance():
     assert len(set(semaphores_seen)) == 1, "Multiple semaphore objects created — race condition!"
 
 
+@pytest.mark.asyncio
+async def test_aspawn_agent_handles_subagent_exception():
+    """aspawn_agent returns a structured error string when subagent.arun raises."""
+    mock_agent = _make_mock_agent()
+    mock_agent.arun = AsyncMock(side_effect=RuntimeError("API rate limit"))
+
+    parent = MagicMock(spec=["model", "tools", "knowledge", "session_state", "id", "name", "metadata", "subagent_template"])
+    parent.model = None
+    parent.tools = []
+    parent.knowledge = None
+    parent.session_state = None
+    parent.id = "p"
+    parent.name = "p"
+    parent.metadata = {}
+    parent.subagent_template = mock_agent
+
+    toolkit = SubAgentToolkit(parent=parent, config=SubAgentConfig())
+    result = await toolkit.aspawn_agent(role="r", instructions="i", task="t")
+
+    assert "failed" in result.lower()
+    assert "API rate limit" in result
+
+
+def test_spawn_agent_handles_subagent_exception():
+    """spawn_agent returns a structured error string when subagent.run raises."""
+    mock_agent = _make_mock_agent()
+    mock_agent.run = MagicMock(side_effect=RuntimeError("model unavailable"))
+
+    parent = MagicMock(spec=["model", "tools", "knowledge", "session_state", "id", "name", "metadata", "subagent_template"])
+    parent.model = None
+    parent.tools = []
+    parent.knowledge = None
+    parent.session_state = None
+    parent.id = "p"
+    parent.name = "p"
+    parent.metadata = {}
+    parent.subagent_template = mock_agent
+
+    toolkit = SubAgentToolkit(parent=parent, config=SubAgentConfig())
+    result = toolkit.spawn_agent(role="r", instructions="i", task="t")
+
+    assert "failed" in result.lower()
+    assert "model unavailable" in result
+
+
 def test_build_additional_context_injects_session_state():
     """_build_additional_context embeds parent session_state as JSON when inject_session_state=True."""
     parent = MagicMock()

@@ -176,7 +176,11 @@ class SubAgentToolkit(Toolkit):
         """
         with self._sync_semaphore:
             subagent = self._build_subagent(role, instructions, tools, expected_output, model_tier, task)
-            result = subagent.run(input=task, stream=False)
+            try:
+                result = subagent.run(input=task, stream=False)
+            except Exception as e:
+                log_warning(f"Subagent '{role}' failed: {e}")
+                return f"Subagent '{role}' failed: {e}"
         if result and result.content:
             return str(result.content)
         return "Subagent completed with no output."
@@ -205,7 +209,11 @@ class SubAgentToolkit(Toolkit):
         """
         async with await self._get_async_semaphore():
             subagent = self._build_subagent(role, instructions, tools, expected_output, model_tier, task)
-            result = await subagent.arun(input=task, stream=False)
+            try:
+                result = await subagent.arun(input=task, stream=False)
+            except Exception as e:
+                log_warning(f"Subagent '{role}' failed: {e}")
+                return f"Subagent '{role}' failed: {e}"
         if result and result.content:
             return str(result.content)
         return "Subagent completed with no output."
