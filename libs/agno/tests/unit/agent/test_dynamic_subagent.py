@@ -61,15 +61,39 @@ def test_subagent_config_accepts_policy_fields():
 # ---------------------------------------------------------------------------
 
 
-def _make_toolkit() -> SubAgentToolkit:
-    """Return a SubAgentToolkit with a minimal mock parent."""
-    parent = MagicMock()
+_PARENT_SPEC = [
+    "model", "tools", "knowledge", "session_state",
+    "id", "name", "metadata", "subagent_template",
+]
+
+
+def _make_parent_mock(*, subagent_template: object = None) -> MagicMock:
+    """Return a minimal MagicMock parent with explicit attribute control.
+
+    Using spec= prevents MagicMock from auto-creating truthy attributes on access,
+    which would cause getattr(parent, 'subagent_template', None) to return a MagicMock
+    instead of None, silently routing _build_subagent through deep_copy instead of
+    the intended fallback path.
+    """
+    parent = MagicMock(spec=_PARENT_SPEC)
     parent.model = None
     parent.tools = []
     parent.knowledge = None
     parent.session_state = None
     parent.id = "parent-id"
-    parent.subagent_template = None
+    parent.name = "parent"
+    parent.metadata = {}
+    parent.subagent_template = subagent_template
+    return parent
+
+
+def _make_toolkit(*, subagent_template: object = None) -> SubAgentToolkit:
+    """Return a SubAgentToolkit with a minimal mock parent.
+
+    Pass subagent_template=_make_mock_agent() to test the template (deep_copy) path.
+    Leave as None to test the fallback Agent() creation path.
+    """
+    parent = _make_parent_mock(subagent_template=subagent_template)
     config = SubAgentConfig()
     return SubAgentToolkit(parent=parent, config=config)
 
@@ -289,31 +313,29 @@ def _make_mock_agent(content: object = "ok") -> MagicMock:
 
 @pytest.mark.asyncio
 async def test_aspawn_agent_returns_content():
-    """aspawn_agent returns the subagent's content string."""
-    toolkit = _make_toolkit()
+    """aspawn_agent returns the subagent's content string (via template deep_copy path)."""
     mock_agent = _make_mock_agent(content="Subagent answer")
+    toolkit = _make_toolkit(subagent_template=mock_agent)
 
-    with patch("agno.agent.agent.Agent", return_value=mock_agent):
-        answer = await toolkit.aspawn_agent(
-            role="helper",
-            instructions="Do the thing",
-            task="What is 1+1?",
-        )
+    answer = await toolkit.aspawn_agent(
+        role="helper",
+        instructions="Do the thing",
+        task="What is 1+1?",
+    )
     assert answer == "Subagent answer"
 
 
 @pytest.mark.asyncio
 async def test_aspawn_agent_no_content_returns_fallback():
-    """aspawn_agent returns fallback message when content is None."""
-    toolkit = _make_toolkit()
+    """aspawn_agent returns fallback message when content is None (via template deep_copy path)."""
     mock_agent = _make_mock_agent(content=None)
+    toolkit = _make_toolkit(subagent_template=mock_agent)
 
-    with patch("agno.agent.agent.Agent", return_value=mock_agent):
-        answer = await toolkit.aspawn_agent(
-            role="helper",
-            instructions="Do the thing",
-            task="What is 1+1?",
-        )
+    answer = await toolkit.aspawn_agent(
+        role="helper",
+        instructions="Do the thing",
+        task="What is 1+1?",
+    )
     assert answer == "Subagent completed with no output."
 
 
