@@ -62,8 +62,14 @@ def test_subagent_config_accepts_policy_fields():
 
 
 _PARENT_SPEC = [
-    "model", "tools", "knowledge", "session_state",
-    "id", "name", "metadata", "subagent_template",
+    "model",
+    "tools",
+    "knowledge",
+    "session_state",
+    "id",
+    "name",
+    "metadata",
+    "subagent_template",
 ]
 
 
@@ -376,7 +382,9 @@ async def test_async_semaphore_single_instance():
     import asyncio
 
     mock_agent = _make_mock_agent(content="ok")
-    parent = MagicMock(spec=["model", "tools", "knowledge", "session_state", "id", "name", "metadata", "subagent_template"])
+    parent = MagicMock(
+        spec=["model", "tools", "knowledge", "session_state", "id", "name", "metadata", "subagent_template"]
+    )
     parent.model = None
     parent.tools = []
     parent.knowledge = None
@@ -413,7 +421,9 @@ async def test_aspawn_agent_handles_subagent_exception():
     mock_agent = _make_mock_agent()
     mock_agent.arun = AsyncMock(side_effect=RuntimeError("API rate limit"))
 
-    parent = MagicMock(spec=["model", "tools", "knowledge", "session_state", "id", "name", "metadata", "subagent_template"])
+    parent = MagicMock(
+        spec=["model", "tools", "knowledge", "session_state", "id", "name", "metadata", "subagent_template"]
+    )
     parent.model = None
     parent.tools = []
     parent.knowledge = None
@@ -435,7 +445,9 @@ def test_spawn_agent_handles_subagent_exception():
     mock_agent = _make_mock_agent()
     mock_agent.run = MagicMock(side_effect=RuntimeError("model unavailable"))
 
-    parent = MagicMock(spec=["model", "tools", "knowledge", "session_state", "id", "name", "metadata", "subagent_template"])
+    parent = MagicMock(
+        spec=["model", "tools", "knowledge", "session_state", "id", "name", "metadata", "subagent_template"]
+    )
     parent.model = None
     parent.tools = []
     parent.knowledge = None
@@ -454,7 +466,9 @@ def test_spawn_agent_handles_subagent_exception():
 
 def test_build_additional_context_warns_on_non_serializable():
     """_build_additional_context emits a log_warning when session_state has non-serializable values."""
-    parent = MagicMock(spec=["model", "tools", "knowledge", "session_state", "id", "name", "metadata", "subagent_template"])
+    parent = MagicMock(
+        spec=["model", "tools", "knowledge", "session_state", "id", "name", "metadata", "subagent_template"]
+    )
     parent.session_state = {"connection": object()}  # not JSON-serializable
 
     config = SubAgentConfig(inject_session_state=True)
@@ -578,7 +592,9 @@ def test_build_subagent_does_not_clear_template_tools_when_no_resolution():
     mock_agent = _make_mock_agent()
     captured = _capture_deep_copy_update(mock_agent)
 
-    parent = MagicMock(spec=["model", "tools", "knowledge", "session_state", "id", "name", "metadata", "subagent_template"])
+    parent = MagicMock(
+        spec=["model", "tools", "knowledge", "session_state", "id", "name", "metadata", "subagent_template"]
+    )
     parent.model = None
     parent.tools = []  # no parent tools to delegate
     parent.knowledge = None
@@ -616,7 +632,9 @@ def test_resolve_tools_whitelist_filtering():
 
     fake_tk = FakeToolkit()
 
-    parent = MagicMock(spec=["model", "tools", "knowledge", "session_state", "id", "name", "metadata", "subagent_template"])
+    parent = MagicMock(
+        spec=["model", "tools", "knowledge", "session_state", "id", "name", "metadata", "subagent_template"]
+    )
     parent.model = None
     parent.tools = [fake_tk]
     parent.knowledge = None
@@ -659,7 +677,9 @@ def test_resolve_tools_whitelist_does_not_leak_unrequested_functions():
 
     multi = MultiTool()
 
-    parent = MagicMock(spec=["model", "tools", "knowledge", "session_state", "id", "name", "metadata", "subagent_template"])
+    parent = MagicMock(
+        spec=["model", "tools", "knowledge", "session_state", "id", "name", "metadata", "subagent_template"]
+    )
     parent.model = None
     parent.tools = [multi]
     parent.knowledge = None
@@ -714,7 +734,9 @@ def _capture_deep_copy_update(mock_agent: MagicMock) -> dict:
     return captured
 
 
-def _make_lineage_parent(*, parent_id: str = "parent-42", name: str = "orchestrator", metadata: dict | None = None) -> MagicMock:
+def _make_lineage_parent(
+    *, parent_id: str = "parent-42", name: str = "orchestrator", metadata: dict | None = None
+) -> MagicMock:
     parent = MagicMock()
     parent.model = None
     parent.tools = []

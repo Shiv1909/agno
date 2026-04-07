@@ -342,10 +342,7 @@ class SubAgentToolkit(Toolkit):
         spawn_depth: int = (getattr(self._parent, "metadata", None) or {}).get("spawn_depth", 0) + 1
         team_id = parent_id if isinstance(self._parent, Team) else None
 
-        log_debug(
-            f"Spawning subagent | parent={parent_name}({parent_id}) "
-            f"role={role!r} depth={spawn_depth}"
-        )
+        log_debug(f"Spawning subagent | parent={parent_name}({parent_id}) role={role!r} depth={spawn_depth}")
 
         # ── Build via deep_copy — preserves all template config ───────────────
         update: dict = {
