@@ -205,6 +205,20 @@ def test_build_guidance_uses_custom_tier_hints():
     assert "extraction" in guidance
 
 
+def test_toolkit_registers_both_sync_and_async_spawn():
+    """Both spawn_agent (sync) and aspawn_agent (async) must be registered as different entrypoints."""
+    mock_agent = _make_mock_agent()
+    toolkit = _make_toolkit(subagent_template=mock_agent)
+
+    assert "spawn_agent" in toolkit.functions, "sync spawn_agent not registered"
+    assert "spawn_agent" in toolkit.async_functions, "async spawn_agent not registered"
+
+    sync_fn = toolkit.functions["spawn_agent"]
+    async_fn = toolkit.async_functions["spawn_agent"]
+    # They must be different Function objects wrapping different callables
+    assert sync_fn is not async_fn, "sync and async spawn_agent should be distinct Function objects"
+
+
 def test_guidance_injected_into_agent_instructions():
     """set_dynamic_subagents appends guidance to agent.instructions."""
     from agno.agent.agent import Agent

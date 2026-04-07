@@ -185,6 +185,13 @@ class SubAgentToolkit(Toolkit):
 
         Returns:
             The string content returned by the subagent, or a fallback message.
+
+        .. warning::
+            This method runs the subagent synchronously and holds the semaphore
+            for the full execution duration.  **Do NOT call it from an async
+            context** (e.g. a FastAPI request handler or an async Jupyter cell)
+            as it will block the event loop.  Use ``aspawn_agent`` instead when
+            running inside an async application.
         """
         with self._sync_semaphore:
             subagent = self._build_subagent(role, instructions, tools, expected_output, model_tier, task)
@@ -316,7 +323,11 @@ class SubAgentToolkit(Toolkit):
         # ── Resolve template ──────────────────────────────────────────────────
         template: Optional[Agent] = getattr(self._parent, "subagent_template", None)
         if template is None:
-            # Minimal default: inherit parent's model so the subagent can run
+            # Minimal default: inherit parent's model so the subagent can run.
+            # NOTE: this Agent is intentionally not yet initialized — Agent.run()
+            # and Agent.arun() call initialize_agent() lazily on first invocation,
+            # so it is safe to deep_copy and pass to run() without calling
+            # initialize_agent() here.
             parent_model = getattr(self._parent, "model", None)
             template = Agent(model=parent_model)
 
