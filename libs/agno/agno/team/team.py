@@ -364,7 +364,9 @@ class Team:
     # --- Dynamic Subagents ---
     # If True, the team leader gains a spawn_agent tool to create ephemeral subagents mid-run
     enable_dynamic_subagents: bool = False
-    # Configuration template for spawned subagents. Uses sensible defaults when None.
+    # Base Agent to deep-copy for every spawned subagent. Inherits team model when None.
+    subagent_template: Optional[Agent] = None
+    # Spawn-time policy (tool delegation, model tiers, concurrency). Uses sensible defaults when None.
     subagent_config: Optional[SubAgentConfig] = None
 
     # --- Debug ---
@@ -550,6 +552,7 @@ class Team:
         callable_knowledge_cache_key: Optional[Callable[..., Optional[str]]] = None,
         callable_members_cache_key: Optional[Callable[..., Optional[str]]] = None,
         enable_dynamic_subagents: bool = False,
+        subagent_template: Optional[Any] = None,
         subagent_config: Optional[SubAgentConfig] = None,
     ):
         _init.__init__(
@@ -673,6 +676,7 @@ class Team:
             callable_knowledge_cache_key=callable_knowledge_cache_key,
             callable_members_cache_key=callable_members_cache_key,
             enable_dynamic_subagents=enable_dynamic_subagents,
+            subagent_template=subagent_template,
             subagent_config=subagent_config,
         )
 

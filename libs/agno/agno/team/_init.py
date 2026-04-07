@@ -26,6 +26,7 @@ from uuid import uuid4
 from pydantic import BaseModel
 
 from agno.agent import Agent
+from agno.agent.subagent import SubAgentConfig
 from agno.compression.manager import CompressionManager
 from agno.db.base import AsyncBaseDb, BaseDb
 from agno.eval.base import BaseEval
@@ -181,8 +182,8 @@ def __init__(
     callable_knowledge_cache_key: Optional[Callable[..., Optional[str]]] = None,
     callable_members_cache_key: Optional[Callable[..., Optional[str]]] = None,
     enable_dynamic_subagents: bool = False,
-    subagent_template: Optional[Any] = None,
-    subagent_config: Optional[Any] = None,
+    subagent_template: Optional[Agent] = None,
+    subagent_config: Optional[SubAgentConfig] = None,
 ):
     from agno.utils.callables import is_callable_factory
 
@@ -702,7 +703,7 @@ def _set_dynamic_subagents(team: "Team") -> None:
     if not team.enable_dynamic_subagents:
         return
 
-    from agno.agent.subagent import SubAgentConfig, SubAgentToolkit
+    from agno.agent.subagent import SubAgentToolkit
 
     # Idempotency guard: do not add a second toolkit on subsequent initialize_team() calls
     if any(isinstance(t, SubAgentToolkit) for t in (team.tools or [])):
