@@ -103,6 +103,18 @@ class SubAgentConfig(BaseModel):
     """Expose ``model_tier`` parameter in ``spawn_agent`` so the LLM can pick
     a cost-appropriate model for each task."""
 
+    tier_hints: Optional[Dict[str, str]] = None
+    """Optional mapping of tier label → usage hint shown to the LLM in guidance.
+    Merged with built-in defaults (``fast``, ``standard``, ``powerful``).
+
+    Example::
+
+        tier_hints={
+            "cheap": "simple lookups, keyword extraction",
+            "turbo": "high-speed summarisation",
+        }
+    """
+
     # ── Context injection ────────────────────────────────────────────────────
     inject_session_state: bool = False
     """Embed parent ``session_state`` as read-only JSON in the subagent's
@@ -258,11 +270,12 @@ class SubAgentToolkit(Toolkit):
                 "",
                 "Model tier selection — use the model_tier parameter to reduce cost:",
             ]
-            _hints = {
+            _default_hints: Dict[str, str] = {
                 "fast": "extraction, formatting, simple classification",
                 "standard": "summarisation, code generation, analysis",
                 "powerful": "complex multi-step reasoning, research synthesis",
             }
+            _hints = {**_default_hints, **(self._config.tier_hints or {})}
             for tier, model_id in self._config.model_tiers.items():
                 hint = _hints.get(tier, "")
                 suffix = f"  (best for: {hint})" if hint else ""

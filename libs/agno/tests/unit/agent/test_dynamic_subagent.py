@@ -188,6 +188,23 @@ def test_build_guidance_includes_model_tiers():
     assert "powerful" in guidance
 
 
+def test_build_guidance_uses_custom_tier_hints():
+    """Custom tier_hints appear in guidance alongside built-in hints."""
+    parent = _make_parent_mock()
+    config = SubAgentConfig(
+        model_tiers={"cheap": "gpt-4o-mini", "fast": "gpt-4o"},
+        allow_model_tier_selection=True,
+        tier_hints={"cheap": "trivial lookups only"},
+    )
+    toolkit = SubAgentToolkit(parent=parent, config=config)
+    guidance = toolkit.build_guidance()
+
+    assert "cheap" in guidance
+    assert "trivial lookups only" in guidance
+    # Built-in fast hint still merged in
+    assert "extraction" in guidance
+
+
 def test_guidance_injected_into_agent_instructions():
     """set_dynamic_subagents appends guidance to agent.instructions."""
     from agno.agent.agent import Agent
