@@ -14,119 +14,50 @@ from agno.agent.subagent import SubAgentConfig, SubAgentToolkit
 
 
 def test_subagent_config_defaults():
-    """Verify all defaults match the spec."""
+    """Verify all defaults match the spec (8 policy fields only)."""
     cfg = SubAgentConfig()
 
-    # Model
-    assert cfg.model is None
-    assert cfg.fallback_models is None
-
-    # Tools
-    assert cfg.tools is None
-    assert cfg.allowed_tools is None
+    # Tool delegation
     assert cfg.inherit_parent_tools is False
-    assert cfg.tool_call_limit is None
-    assert cfg.tool_hooks is None
+    assert cfg.allowed_tools is None
+    assert cfg.allow_tool_selection is True
+    assert cfg.context_heavy_tools is None
 
-    # Knowledge / RAG
-    assert cfg.knowledge is None
-    assert cfg.inherit_parent_knowledge is False
-    assert cfg.knowledge_filters is None
-    assert cfg.search_knowledge is True
-    assert cfg.add_knowledge_to_context is False
-    assert cfg.references_format == "json"
+    # Model tiers
+    assert cfg.model_tiers is None
+    assert cfg.allow_model_tier_selection is False
 
-    # Context from parent
+    # Context injection
     assert cfg.inject_session_state is False
-    assert cfg.additional_context is None
 
-    # Output
-    assert cfg.markdown is False
-    assert cfg.parse_response is True
-    assert cfg.structured_outputs is None
-    assert cfg.use_json_mode is False
-
-    # Reasoning
-    assert cfg.reasoning is False
-    assert cfg.reasoning_model is None
-    assert cfg.reasoning_min_steps == 1
-    assert cfg.reasoning_max_steps == 10
-
-    # Retry
-    assert cfg.retries == 0
-    assert cfg.delay_between_retries == 1
-    assert cfg.exponential_backoff is False
-
-    # Hooks
-    assert cfg.pre_hooks is None
-    assert cfg.post_hooks is None
-
-    # Limits
+    # Concurrency
     assert cfg.max_concurrent == 5
 
-    # LLM overrides
-    assert cfg.allow_model_override is False
-    assert cfg.allow_tool_selection is True
 
-    # Debug
-    assert cfg.debug_mode is False
-
-
-def test_subagent_config_accepts_model():
-    """Verify model, markdown, and tool_call_limit can be overridden."""
-    mock_model = MagicMock()
+def test_subagent_config_accepts_policy_fields():
+    """Verify all policy fields round-trip correctly."""
     cfg = SubAgentConfig(
-        model=mock_model,
-        markdown=True,
-        tool_call_limit=5,
-    )
-    assert cfg.model is mock_model
-    assert cfg.markdown is True
-    assert cfg.tool_call_limit == 5
-
-
-def test_subagent_config_accepts_other_fields():
-    """Verify a broader set of non-default values round-trip correctly."""
-    cfg = SubAgentConfig(
-        tools=["tool_a"],
-        allowed_tools=["tool_b"],
         inherit_parent_tools=True,
-        inherit_parent_knowledge=True,
-        inject_session_state=True,
-        additional_context="ctx",
-        references_format="yaml",
-        reasoning=True,
-        reasoning_min_steps=2,
-        reasoning_max_steps=8,
-        retries=3,
-        delay_between_retries=2,
-        exponential_backoff=True,
-        max_concurrent=10,
-        allow_model_override=True,
+        allowed_tools=["search", "write"],
         allow_tool_selection=False,
-        debug_mode=True,
+        context_heavy_tools=["query_db", "read_file"],
+        model_tiers={"fast": "gpt-4o-mini", "standard": "gpt-4o"},
+        allow_model_tier_selection=True,
+        inject_session_state=True,
+        max_concurrent=10,
     )
-    assert cfg.tools == ["tool_a"]
-    assert cfg.allowed_tools == ["tool_b"]
     assert cfg.inherit_parent_tools is True
-    assert cfg.inherit_parent_knowledge is True
-    assert cfg.inject_session_state is True
-    assert cfg.additional_context == "ctx"
-    assert cfg.references_format == "yaml"
-    assert cfg.reasoning is True
-    assert cfg.reasoning_min_steps == 2
-    assert cfg.reasoning_max_steps == 8
-    assert cfg.retries == 3
-    assert cfg.delay_between_retries == 2
-    assert cfg.exponential_backoff is True
-    assert cfg.max_concurrent == 10
-    assert cfg.allow_model_override is True
+    assert cfg.allowed_tools == ["search", "write"]
     assert cfg.allow_tool_selection is False
-    assert cfg.debug_mode is True
+    assert cfg.context_heavy_tools == ["query_db", "read_file"]
+    assert cfg.model_tiers == {"fast": "gpt-4o-mini", "standard": "gpt-4o"}
+    assert cfg.allow_model_tier_selection is True
+    assert cfg.inject_session_state is True
+    assert cfg.max_concurrent == 10
 
 
 # ---------------------------------------------------------------------------
-# SubAgentToolkit tests
+# SubAgentToolkit registration tests
 # ---------------------------------------------------------------------------
 
 
@@ -138,6 +69,7 @@ def _make_toolkit() -> SubAgentToolkit:
     parent.knowledge = None
     parent.session_state = None
     parent.id = "parent-id"
+    parent.subagent_template = None
     config = SubAgentConfig()
     return SubAgentToolkit(parent=parent, config=config)
 
@@ -151,31 +83,25 @@ def test_subagent_toolkit_registers_tool():
 
 
 def test_subagent_toolkit_tool_description():
-    """The sync function object must have a description and the expected parameter properties."""
+    """The sync function must have a description and the expected parameter properties."""
     toolkit = _make_toolkit()
-
     fn = toolkit.functions["spawn_agent"]
-
-    # process_entrypoint populates description and parameters (done lazily by agent at run time;
-    # we call it explicitly here so we can inspect the schema without a full agent run).
     fn.process_entrypoint()
 
-    # description must be set (not None / empty)
     assert fn.description, "spawn_agent Function.description should not be empty"
 
-    # parameters schema must include role, instructions, task
     props = fn.parameters.get("properties", {})
     for expected_param in ("role", "instructions", "task"):
         assert expected_param in props, f"Expected parameter '{expected_param}' not found in spawn_agent schema"
 
+    # model_tier should be present (optional)
+    assert "model_tier" in props, "model_tier parameter missing from spawn_agent schema"
+
 
 def test_subagent_toolkit_async_tool_description():
-    """The async function object must also have the correct parameter schema."""
+    """The async function must also have the correct parameter schema."""
     toolkit = _make_toolkit()
-
     async_fn = toolkit.async_functions["spawn_agent"]
-
-    # process_entrypoint populates description and parameters for the async variant too.
     async_fn.process_entrypoint()
 
     assert async_fn.description, "async spawn_agent Function.description should not be empty"
@@ -186,16 +112,82 @@ def test_subagent_toolkit_async_tool_description():
 
 
 # ---------------------------------------------------------------------------
+# Guidance injection tests
+# ---------------------------------------------------------------------------
+
+
+def test_build_guidance_basic():
+    """build_guidance returns a non-empty string."""
+    toolkit = _make_toolkit()
+    guidance = toolkit.build_guidance()
+    assert guidance
+    assert "spawn_agent" in guidance
+
+
+def test_build_guidance_includes_context_heavy_tools():
+    """context_heavy_tools appear in the guidance block."""
+    parent = MagicMock()
+    parent.model = None
+    parent.tools = []
+    parent.knowledge = None
+    parent.session_state = None
+    parent.id = "p"
+    parent.subagent_template = None
+
+    config = SubAgentConfig(context_heavy_tools=["query_db", "read_csv"])
+    toolkit = SubAgentToolkit(parent=parent, config=config)
+    guidance = toolkit.build_guidance()
+
+    assert "query_db" in guidance
+    assert "read_csv" in guidance
+
+
+def test_build_guidance_includes_model_tiers():
+    """model_tiers appear in the guidance when allow_model_tier_selection=True."""
+    parent = MagicMock()
+    parent.model = None
+    parent.tools = []
+    parent.knowledge = None
+    parent.session_state = None
+    parent.id = "p"
+    parent.subagent_template = None
+
+    config = SubAgentConfig(
+        model_tiers={"fast": "gpt-4o-mini", "powerful": "o3"},
+        allow_model_tier_selection=True,
+    )
+    toolkit = SubAgentToolkit(parent=parent, config=config)
+    guidance = toolkit.build_guidance()
+
+    assert "fast" in guidance
+    assert "gpt-4o-mini" in guidance
+    assert "powerful" in guidance
+
+
+def test_guidance_injected_into_agent_instructions():
+    """set_dynamic_subagents appends guidance to agent.instructions."""
+    from agno.agent.agent import Agent
+
+    agent = Agent(name="test", enable_dynamic_subagents=True)
+    agent.initialize_agent()
+
+    assert agent.instructions is not None
+    assert "spawn_agent" in str(agent.instructions)
+    assert "Dynamic Subagent Guidance" in str(agent.instructions)
+
+
+# ---------------------------------------------------------------------------
 # Agent integration tests
 # ---------------------------------------------------------------------------
 
 
 def test_agent_has_dynamic_subagent_fields():
-    """Agent accepts enable_dynamic_subagents and subagent_config."""
+    """Agent accepts enable_dynamic_subagents, subagent_template, and subagent_config."""
     from agno.agent.agent import Agent
 
     agent = Agent(name="test", enable_dynamic_subagents=False)
     assert agent.enable_dynamic_subagents is False
+    assert agent.subagent_template is None
     assert agent.subagent_config is None
 
 
@@ -204,25 +196,47 @@ def test_agent_wires_toolkit_when_enabled():
     from agno.agent.agent import Agent
 
     agent = Agent(name="test", enable_dynamic_subagents=True)
-    # initialize_agent is called lazily (on first run); invoke explicitly for testing
     agent.initialize_agent()
 
     toolkit_found = any(isinstance(t, SubAgentToolkit) for t in (agent.tools or []))
     assert toolkit_found, "SubAgentToolkit should be in agent.tools when enable_dynamic_subagents=True"
 
 
+def test_toolkit_not_duplicated_on_repeated_run():
+    """set_dynamic_subagents must not add a second toolkit on repeated initialize_agent calls."""
+    from agno.agent.agent import Agent
+
+    agent = Agent(name="test", enable_dynamic_subagents=True)
+    agent.initialize_agent()
+    agent.initialize_agent()  # second call simulates second run()
+
+    toolkits = [t for t in (agent.tools or []) if isinstance(t, SubAgentToolkit)]
+    assert len(toolkits) == 1, f"Expected 1 SubAgentToolkit, found {len(toolkits)}"
+
+
 def test_agent_wires_toolkit_with_custom_config():
     """Custom SubAgentConfig is threaded through to the toolkit."""
     from agno.agent.agent import Agent
 
-    config = SubAgentConfig(markdown=True, max_concurrent=2)
+    config = SubAgentConfig(max_concurrent=2, context_heavy_tools=["big_query"])
     agent = Agent(name="test", enable_dynamic_subagents=True, subagent_config=config)
     agent.initialize_agent()
 
     toolkit = next((t for t in (agent.tools or []) if isinstance(t, SubAgentToolkit)), None)
     assert toolkit is not None
-    assert toolkit._config.markdown is True
     assert toolkit._config.max_concurrent == 2
+    assert toolkit._config.context_heavy_tools == ["big_query"]
+
+
+def test_agent_with_subagent_template():
+    """subagent_template is stored on the agent."""
+    from agno.agent.agent import Agent
+
+    template = Agent(name="template_agent")
+    agent = Agent(name="orchestrator", enable_dynamic_subagents=True, subagent_template=template)
+    agent.initialize_agent()
+
+    assert agent.subagent_template is template
 
 
 # ---------------------------------------------------------------------------
@@ -231,13 +245,14 @@ def test_agent_wires_toolkit_with_custom_config():
 
 
 def test_team_has_dynamic_subagent_fields():
-    """Team accepts enable_dynamic_subagents and subagent_config."""
+    """Team accepts enable_dynamic_subagents, subagent_template, and subagent_config."""
     from agno.agent.agent import Agent
     from agno.team.team import Team
 
     member = Agent(name="member")
     team = Team(members=[member], enable_dynamic_subagents=False)
     assert team.enable_dynamic_subagents is False
+    assert team.subagent_template is None
     assert team.subagent_config is None
 
 
@@ -260,12 +275,15 @@ def test_team_wires_toolkit_when_enabled():
 
 
 def _make_mock_agent(content: object = "ok") -> MagicMock:
-    """Return a MagicMock that quacks like an Agent with arun/run."""
+    """Return a MagicMock that quacks like an Agent with arun/run/deep_copy."""
     agent_mock = MagicMock()
     result_mock = MagicMock()
     result_mock.content = content
     agent_mock.arun = AsyncMock(return_value=result_mock)
     agent_mock.run = MagicMock(return_value=result_mock)
+    # _build_subagent calls template.deep_copy(update={...}) — return self so
+    # the mock's arun/run are preserved on the spawned agent.
+    agent_mock.deep_copy = MagicMock(return_value=agent_mock)
     return agent_mock
 
 
@@ -273,7 +291,6 @@ def _make_mock_agent(content: object = "ok") -> MagicMock:
 async def test_aspawn_agent_returns_content():
     """aspawn_agent returns the subagent's content string."""
     toolkit = _make_toolkit()
-
     mock_agent = _make_mock_agent(content="Subagent answer")
 
     with patch("agno.agent.agent.Agent", return_value=mock_agent):
@@ -289,7 +306,6 @@ async def test_aspawn_agent_returns_content():
 async def test_aspawn_agent_no_content_returns_fallback():
     """aspawn_agent returns fallback message when content is None."""
     toolkit = _make_toolkit()
-
     mock_agent = _make_mock_agent(content=None)
 
     with patch("agno.agent.agent.Agent", return_value=mock_agent):
@@ -301,44 +317,115 @@ async def test_aspawn_agent_no_content_returns_fallback():
     assert answer == "Subagent completed with no output."
 
 
+def test_build_additional_context_injects_session_state():
+    """_build_additional_context embeds parent session_state as JSON when inject_session_state=True."""
+    parent = MagicMock()
+    parent.session_state = {"user": "alice", "plan": "premium"}
+
+    config = SubAgentConfig(inject_session_state=True)
+    toolkit = SubAgentToolkit(parent=parent, config=config)
+
+    ctx = toolkit._build_additional_context()
+    assert ctx is not None
+    assert "alice" in ctx
+    assert "premium" in ctx
+
+
+def test_build_additional_context_skipped_when_disabled():
+    """_build_additional_context returns None when inject_session_state=False."""
+    parent = MagicMock()
+    parent.session_state = {"user": "bob"}
+
+    config = SubAgentConfig(inject_session_state=False)
+    toolkit = SubAgentToolkit(parent=parent, config=config)
+
+    assert toolkit._build_additional_context() is None
+
+
 @pytest.mark.asyncio
 async def test_aspawn_agent_injects_session_state():
-    """When inject_session_state=True, the built Agent receives additional_context with the state."""
+    """When inject_session_state=True, deep_copy receives additional_context with the state."""
     parent = MagicMock()
     parent.model = None
     parent.tools = []
     parent.knowledge = None
     parent.session_state = {"user": "alice"}
     parent.id = "parent-id"
+    parent.name = "p"
+    parent.metadata = {}
+    parent.subagent_template = None
 
     config = SubAgentConfig(inject_session_state=True)
     toolkit = SubAgentToolkit(parent=parent, config=config)
 
-    captured_kwargs: dict = {}
+    captured_update: dict = {}
+    mock_agent = _make_mock_agent(content="ok")
 
-    def fake_agent_init(*args: object, **kwargs: object) -> MagicMock:
-        captured_kwargs.update(kwargs)
-        agent_mock = _make_mock_agent(content="ok")
-        return agent_mock
+    def capture_deep_copy(**kwargs: object) -> MagicMock:
+        if "update" in kwargs and isinstance(kwargs["update"], dict):
+            captured_update.update(kwargs["update"])  # type: ignore[arg-type]
+        return mock_agent
 
-    with patch("agno.agent.agent.Agent", side_effect=fake_agent_init):
+    mock_agent.deep_copy = MagicMock(side_effect=capture_deep_copy)
+
+    with patch("agno.agent.agent.Agent", return_value=mock_agent):
         await toolkit.aspawn_agent(
             role="helper",
             instructions="Help out",
             task="greet",
         )
 
-    assert "additional_context" in captured_kwargs
-    assert "alice" in captured_kwargs["additional_context"]
+    assert "additional_context" in captured_update
+    assert "alice" in captured_update["additional_context"]
+
+
+@pytest.mark.asyncio
+async def test_aspawn_agent_does_not_pass_session_state_to_run():
+    """session_state is NOT passed to subagent.run() — only embedded in additional_context."""
+    parent = MagicMock()
+    parent.model = None
+    parent.tools = []
+    parent.knowledge = None
+    parent.session_state = {"user": "bob"}
+    parent.id = "pid"
+    parent.name = "p"
+    parent.metadata = {}
+    parent.subagent_template = None
+
+    config = SubAgentConfig(inject_session_state=True)
+    toolkit = SubAgentToolkit(parent=parent, config=config)
+
+    captured_run_kwargs: dict = {}
+    result_mock = MagicMock()
+    result_mock.content = "done"
+
+    # Build a mock that captures arun kwargs and has deep_copy returning itself
+    mock_agent = MagicMock()
+
+    async def fake_arun(*args: object, **kwargs: object) -> MagicMock:
+        captured_run_kwargs.update(kwargs)
+        return result_mock
+
+    mock_agent.arun = fake_arun
+    mock_agent.deep_copy = MagicMock(return_value=mock_agent)
+
+    with patch("agno.agent.agent.Agent", return_value=mock_agent):
+        await toolkit.aspawn_agent(role="r", instructions="i", task="t")
+
+    # session_state must NOT be in the run() call (only in additional_context)
+    assert "session_state" not in captured_run_kwargs
+
+
+# ---------------------------------------------------------------------------
+# Tool whitelist filtering
+# ---------------------------------------------------------------------------
 
 
 def test_resolve_tools_whitelist_filtering():
-    """_resolve_tools includes a toolkit when at least one of its functions is in allowed_tools."""
+    """_resolve_tools includes a toolkit when at least one function is in allowed_tools."""
     from agno.tools import Toolkit as _Toolkit
 
     class FakeToolkit(_Toolkit):
-        """Minimal toolkit subclass with do_search and do_write functions registered."""
-
         def __init__(self) -> None:
             super().__init__(name="fake")
             self.functions["do_search"] = MagicMock()
@@ -352,13 +439,29 @@ def test_resolve_tools_whitelist_filtering():
     parent.knowledge = None
     parent.session_state = None
     parent.id = "parent-id"
+    parent.subagent_template = None
 
     config = SubAgentConfig(allowed_tools=["do_search"])
     toolkit = SubAgentToolkit(parent=parent, config=config)
 
-    resolved = toolkit._resolve_tools(["do_search", "do_write"])
-
+    resolved = toolkit._resolve_tools(["do_search", "do_write"], template_tools=None)
     assert fake_tk in resolved, "FakeToolkit should be included because do_search is in allowed_tools"
+
+
+def test_resolve_tools_inherit_parent():
+    """inherit_parent_tools=True returns all parent tools regardless of selection."""
+    parent = MagicMock()
+    tool_a = MagicMock()
+    tool_b = MagicMock()
+    parent.tools = [tool_a, tool_b]
+    parent.subagent_template = None
+
+    config = SubAgentConfig(inherit_parent_tools=True)
+    toolkit = SubAgentToolkit(parent=parent, config=config)
+
+    resolved = toolkit._resolve_tools(["tool_x"], template_tools=None)
+    assert tool_a in resolved
+    assert tool_b in resolved
 
 
 # ---------------------------------------------------------------------------
@@ -366,33 +469,48 @@ def test_resolve_tools_whitelist_filtering():
 # ---------------------------------------------------------------------------
 
 
-def test_subagent_metadata_carries_lineage():
-    """_build_subagent passes spawned_by_* and spawn_depth in metadata."""
+def _capture_deep_copy_update(mock_agent: MagicMock) -> dict:
+    """Wire mock_agent.deep_copy to capture the update dict and return self."""
     captured: dict = {}
 
-    def fake_agent_init(*args: object, **kwargs: object) -> MagicMock:
-        captured.update(kwargs)
-        return MagicMock()
+    def capture(**kwargs: object) -> MagicMock:
+        if "update" in kwargs and isinstance(kwargs["update"], dict):
+            captured.update(kwargs["update"])  # type: ignore[arg-type]
+        return mock_agent
 
+    mock_agent.deep_copy = MagicMock(side_effect=capture)
+    return captured
+
+
+def _make_lineage_parent(*, parent_id: str = "parent-42", name: str = "orchestrator", metadata: dict | None = None) -> MagicMock:
     parent = MagicMock()
     parent.model = None
     parent.tools = []
     parent.knowledge = None
     parent.session_state = None
-    parent.id = "parent-42"
-    parent.name = "orchestrator"
-    parent.metadata = {}  # depth 0 parent
+    parent.id = parent_id
+    parent.name = name
+    parent.metadata = metadata if metadata is not None else {}
+    parent.subagent_template = None
+    return parent
 
-    config = SubAgentConfig()
-    toolkit = SubAgentToolkit(parent=parent, config=config)
 
-    with patch("agno.agent.agent.Agent", side_effect=fake_agent_init):
+def test_subagent_metadata_carries_lineage():
+    """_build_subagent passes spawned_by_* and spawn_depth in metadata via deep_copy update."""
+    parent = _make_lineage_parent(parent_id="parent-42", name="orchestrator")
+    toolkit = SubAgentToolkit(parent=parent, config=SubAgentConfig())
+
+    mock_agent = _make_mock_agent()
+    captured = _capture_deep_copy_update(mock_agent)
+
+    with patch("agno.agent.agent.Agent", return_value=mock_agent):
         toolkit._build_subagent(
             role="rust_dev",
             instructions="Write Rust code.",
             tool_names=None,
             expected_output=None,
-            model_override=None,
+            model_tier=None,
+            task="Implement a binary search tree in Rust.",
         )
 
     meta = captured.get("metadata", {})
@@ -400,40 +518,58 @@ def test_subagent_metadata_carries_lineage():
     assert meta.get("spawned_by_agent_name") == "orchestrator"
     assert meta.get("spawn_role") == "rust_dev"
     assert meta.get("spawn_depth") == 1
-    assert "spawn_task" in meta
+    assert "binary search tree" in meta.get("spawn_task", "")
+
+
+def test_subagent_spawn_task_uses_task_not_instructions():
+    """spawn_task in metadata is the task argument, not the instructions."""
+    parent = _make_lineage_parent()
+    toolkit = SubAgentToolkit(parent=parent, config=SubAgentConfig())
+
+    mock_agent = _make_mock_agent()
+    captured = _capture_deep_copy_update(mock_agent)
+
+    with patch("agno.agent.agent.Agent", return_value=mock_agent):
+        toolkit._build_subagent(
+            role="worker",
+            instructions="You are a specialist system prompt that is very long.",
+            tool_names=None,
+            expected_output=None,
+            model_tier=None,
+            task="Concrete user task here.",
+        )
+
+    spawn_task = captured.get("metadata", {}).get("spawn_task", "")
+    assert "Concrete user task" in spawn_task
+    assert "specialist system prompt" not in spawn_task
 
 
 def test_subagent_spawn_depth_increments():
     """spawn_depth increments when parent itself was a subagent (depth 1 → child is depth 2)."""
-    captured: dict = {}
+    parent = _make_lineage_parent(parent_id="subagent-1", name="intermediate", metadata={"spawn_depth": 1})
+    toolkit = SubAgentToolkit(parent=parent, config=SubAgentConfig())
 
-    def fake_agent_init(*args: object, **kwargs: object) -> MagicMock:
-        captured.update(kwargs)
-        return MagicMock()
+    mock_agent = _make_mock_agent()
+    captured = _capture_deep_copy_update(mock_agent)
 
-    # Simulate a parent that was itself spawned (depth=1 in its metadata)
-    parent = MagicMock()
-    parent.model = None
-    parent.tools = []
-    parent.knowledge = None
-    parent.session_state = None
-    parent.id = "subagent-1"
-    parent.name = "intermediate"
-    parent.metadata = {"spawn_depth": 1}
-
-    config = SubAgentConfig()
-    toolkit = SubAgentToolkit(parent=parent, config=config)
-
-    with patch("agno.agent.agent.Agent", side_effect=fake_agent_init):
-        toolkit._build_subagent(
-            role="child",
-            instructions="Do something.",
-            tool_names=None,
-            expected_output=None,
-            model_override=None,
-        )
+    with patch("agno.agent.agent.Agent", return_value=mock_agent):
+        toolkit._build_subagent("child", "Do something.", None, None, None, "child task")
 
     assert captured.get("metadata", {}).get("spawn_depth") == 2
+
+
+def test_subagent_recursion_disabled():
+    """Spawned subagents always have enable_dynamic_subagents=False."""
+    parent = _make_lineage_parent()
+    toolkit = SubAgentToolkit(parent=parent, config=SubAgentConfig())
+
+    mock_agent = _make_mock_agent()
+    captured = _capture_deep_copy_update(mock_agent)
+
+    with patch("agno.agent.agent.Agent", return_value=mock_agent):
+        toolkit._build_subagent("r", "i", None, None, None, "t")
+
+    assert captured.get("enable_dynamic_subagents") is False
 
 
 def test_team_parent_sets_team_id():
@@ -441,27 +577,17 @@ def test_team_parent_sets_team_id():
     from agno.agent.agent import Agent
     from agno.team.team import Team
 
-    captured: dict = {}
-
-    def fake_agent_init(*args: object, **kwargs: object) -> MagicMock:
-        captured.update(kwargs)
-        return MagicMock()
-
     member = Agent(name="member")
     team = Team(members=[member], name="my_team")
     team.initialize_team()
 
-    config = SubAgentConfig()
-    toolkit = SubAgentToolkit(parent=team, config=config)
+    toolkit = SubAgentToolkit(parent=team, config=SubAgentConfig())
 
-    with patch("agno.agent.agent.Agent", side_effect=fake_agent_init):
-        toolkit._build_subagent(
-            role="specialist",
-            instructions="Specialize.",
-            tool_names=None,
-            expected_output=None,
-            model_override=None,
-        )
+    mock_agent = _make_mock_agent()
+    captured = _capture_deep_copy_update(mock_agent)
+
+    with patch("agno.agent.agent.Agent", return_value=mock_agent):
+        toolkit._build_subagent("specialist", "Specialize.", None, None, None, "task")
 
     assert captured.get("team_id") == team.id
 
@@ -470,25 +596,15 @@ def test_agent_parent_does_not_set_team_id():
     """When parent is an Agent (not a Team), team_id is None on the subagent."""
     from agno.agent.agent import Agent
 
-    captured: dict = {}
-
-    def fake_agent_init(*args: object, **kwargs: object) -> MagicMock:
-        captured.update(kwargs)
-        return MagicMock()
-
     parent = Agent(name="solo_agent")
     parent.initialize_agent()
 
-    config = SubAgentConfig()
-    toolkit = SubAgentToolkit(parent=parent, config=config)
+    toolkit = SubAgentToolkit(parent=parent, config=SubAgentConfig())
 
-    with patch("agno.agent.agent.Agent", side_effect=fake_agent_init):
-        toolkit._build_subagent(
-            role="helper",
-            instructions="Help.",
-            tool_names=None,
-            expected_output=None,
-            model_override=None,
-        )
+    mock_agent = _make_mock_agent()
+    captured = _capture_deep_copy_update(mock_agent)
+
+    with patch("agno.agent.agent.Agent", return_value=mock_agent):
+        toolkit._build_subagent("helper", "Help.", None, None, None, "task")
 
     assert captured.get("team_id") is None

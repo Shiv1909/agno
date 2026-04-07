@@ -238,17 +238,35 @@ def get_models(agent: Agent) -> None:
 
 
 def set_dynamic_subagents(agent: "Agent") -> None:
-    """Append SubAgentToolkit to agent.tools when enable_dynamic_subagents is True."""
+    """Append SubAgentToolkit to agent.tools and inject context-isolation guidance."""
     if not agent.enable_dynamic_subagents:
         return
 
     from agno.agent.subagent import SubAgentConfig, SubAgentToolkit
 
+    # Idempotency guard: do not add a second toolkit on subsequent initialize_agent() calls
+    if any(isinstance(t, SubAgentToolkit) for t in (agent.tools or [])):
+        return
+
     config = agent.subagent_config or SubAgentConfig()
     toolkit = SubAgentToolkit(parent=agent, config=config)
 
+    # Inject guidance into the parent's instructions so the LLM knows when
+    # and how to use spawn_agent (context_heavy_tools, model tiers, etc.)
+    guidance = toolkit.build_guidance()
+    if isinstance(agent.instructions, str):
+        agent.instructions = (agent.instructions + "\n\n" + guidance) if agent.instructions else guidance
+    elif isinstance(agent.instructions, list):
+        agent.instructions = list(agent.instructions) + [guidance]
+    elif agent.instructions is None:
+        agent.instructions = guidance
+    # Callable instructions cannot be augmented at init time; the LLM will
+    # still have the tool description to guide it.
+
     if isinstance(agent.tools, list):
         agent.tools.append(toolkit)
+    elif agent.tools is None:
+        agent.tools = [toolkit]
     else:
         log_warning(
             "enable_dynamic_subagents=True is not supported when tools is a callable factory. "
