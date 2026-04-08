@@ -662,6 +662,8 @@ def accumulate_model_metrics(
     audio_input_tokens = usage.audio_input_tokens or 0
     audio_output_tokens = usage.audio_output_tokens or 0
     audio_total_tokens = usage.audio_total_tokens or 0
+    if audio_total_tokens == 0 and (audio_input_tokens > 0 or audio_output_tokens > 0):
+        audio_total_tokens = audio_input_tokens + audio_output_tokens
     cache_read_tokens = usage.cache_read_tokens or 0
     cache_write_tokens = usage.cache_write_tokens or 0
     reasoning_tokens = usage.reasoning_tokens or 0
