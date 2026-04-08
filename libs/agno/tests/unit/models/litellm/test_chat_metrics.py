@@ -1,32 +1,10 @@
 """Unit tests for LiteLLM metrics collection."""
 
-import importlib
-import sys
-import types
-from typing import Any
+import pytest
 
+pytest.importorskip("litellm")
 
-anthropic_module: Any = types.ModuleType("anthropic")
-anthropic_types_module: Any = types.ModuleType("anthropic.types")
-
-
-class _AnthropicBlock:
-    def __init__(self, *args, **kwargs):
-        self.args = args
-        self.kwargs = kwargs
-
-
-anthropic_types_module.TextBlock = _AnthropicBlock
-anthropic_types_module.ToolUseBlock = _AnthropicBlock
-anthropic_module.types = anthropic_types_module
-
-litellm_module: Any = types.ModuleType("litellm")
-litellm_module.validate_environment = lambda *args, **kwargs: {}
-litellm_module.token_counter = lambda *args, **kwargs: 0
-
-sys.modules.setdefault("anthropic", anthropic_module)
-sys.modules.setdefault("anthropic.types", anthropic_types_module)
-sys.modules.setdefault("litellm", litellm_module)
+from agno.models.litellm import LiteLLM
 
 
 class MockTokenDetails:
@@ -50,13 +28,8 @@ class MockCompletionUsage:
         self.completion_tokens_details = completion_tokens_details
 
 
-def _make_model():
-    LiteLLM = importlib.import_module("agno.models.litellm").LiteLLM
-    return LiteLLM(id="test-model")
-
-
 def test_litellm_get_metrics_computes_audio_total_tokens_for_dict_usage():
-    model = _make_model()
+    model = LiteLLM(id="test-model")
     usage = {
         "prompt_tokens": 30,
         "completion_tokens": 12,
@@ -75,7 +48,7 @@ def test_litellm_get_metrics_computes_audio_total_tokens_for_dict_usage():
 
 
 def test_litellm_get_metrics_computes_audio_total_tokens_for_object_usage():
-    model = _make_model()
+    model = LiteLLM(id="test-model")
     usage = MockCompletionUsage(
         prompt_tokens=30,
         completion_tokens=12,

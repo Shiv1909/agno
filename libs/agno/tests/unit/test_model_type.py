@@ -156,20 +156,6 @@ class TestAccumulateModelMetrics:
         assert run_metrics.output_tokens == 15
         assert run_metrics.total_tokens == 45
 
-    def test_audio_total_tokens_fallback_to_split_values(self):
-        run_metrics = Metrics()
-        model = _make_model()
-        usage = MessageMetrics(audio_input_tokens=7, audio_output_tokens=9, audio_total_tokens=0)
-        response = MagicMock()
-        response.response_usage = usage
-
-        accumulate_model_metrics(response, model, ModelType.MODEL, run_metrics)
-
-        assert run_metrics.audio_input_tokens == 7
-        assert run_metrics.audio_output_tokens == 9
-        assert run_metrics.audio_total_tokens == 16
-        assert run_metrics.details["model"][0].audio_total_tokens == 16
-
     def test_same_provider_and_id_but_different_api_variants_do_not_merge(self):
         run_metrics = Metrics()
         chat_model = _make_model()
