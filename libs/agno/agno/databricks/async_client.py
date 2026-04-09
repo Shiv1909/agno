@@ -8,11 +8,9 @@ import httpx
 from agno.databricks.auth import build_databricks_headers
 from agno.databricks.errors import map_databricks_request_error, raise_for_databricks_response
 from agno.databricks.settings import DatabricksSettings
-from agno.databricks.utils import build_url, merge_headers
+from agno.databricks.utils import RETRYABLE_STATUS_CODES, build_url, merge_headers
 from agno.utils.http import get_default_async_client
 from agno.utils.log import log_warning
-
-from agno.databricks.utils import RETRYABLE_STATUS_CODES
 
 
 class AsyncDatabricksClient:

@@ -7,7 +7,6 @@ from agno.databricks.utils import normalize_host
 from agno.tools import Toolkit
 from agno.utils.log import log_debug, log_error
 
-READ_ONLY_PREFIXES = ("SELECT", "WITH", "SHOW", "DESCRIBE", "DESC", "EXPLAIN")
 BLOCKED_PREFIXES = (
     "INSERT",
     "UPDATE",
@@ -318,6 +317,12 @@ class DatabricksSQLTools(Toolkit):
 
         if statement_keyword in BLOCKED_PREFIXES:
             raise ValueError("Only read-only SQL statements are allowed")
+        if statement_keyword == "EXPLAIN":
+            explain_scanner = _SQLScanner(cleaned_query)
+            explain_scanner.read_keyword()  # consume EXPLAIN
+            inner_keyword = explain_scanner.read_keyword()
+            if inner_keyword is not None and inner_keyword in BLOCKED_PREFIXES:
+                raise ValueError("Only read-only SQL statements are allowed")
         if statement_keyword not in {"SELECT", "SHOW", "DESCRIBE", "DESC", "EXPLAIN"}:
             raise ValueError("Query must start with SELECT, WITH, SHOW, DESCRIBE, DESC, or EXPLAIN")
 

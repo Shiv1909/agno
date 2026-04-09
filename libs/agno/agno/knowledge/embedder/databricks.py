@@ -11,7 +11,7 @@ from agno.utils.log import log_warning
 @dataclass
 class DatabricksEmbedder(Embedder):
     id: str = "databricks-embedding-endpoint"
-    dimensions: Optional[int] = None
+    dimensions: Optional[int] = None  # Auto-learned from first API response; set explicitly for create()
     endpoint: Optional[str] = None
     host: Optional[str] = None
     workspace_url: Optional[str] = None

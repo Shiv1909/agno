@@ -102,6 +102,8 @@ def serialize_sdk_item(item: Any) -> Dict[str, Any]:
 
 def serialize_sdk_items(items: Any, limit: Optional[int], max_results: int) -> List[Dict[str, Any]]:
     """Serialize an iterable of Databricks SDK objects to a list of dictionaries."""
+    if items is None:
+        return []
     if isinstance(items, dict):
         return [items]
     effective_limit = max_results if limit is None else min(limit, max_results)

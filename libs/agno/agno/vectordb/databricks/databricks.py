@@ -24,6 +24,13 @@ def _get_vector_search_client_cls():
 
 
 class DatabricksVectorDb(VectorDb):
+    """Databricks Vector Search integration for agno knowledge bases.
+
+    Note: Delete and exists operations use full index scans (O(N)) because the
+    Databricks Vector Search SDK does not support filtered point lookups. For
+    large indexes (>10k rows), these operations may be slow.
+    """
+
     def __init__(
         self,
         *,
@@ -211,15 +218,7 @@ class DatabricksVectorDb(VectorDb):
             log_info("No documents to upsert")
             return
 
-        # Single scan: find and delete existing rows with matching content_hash
-        existing_keys = [
-            row[self.primary_key]
-            for row in self._scan_all_rows()
-            if row.get(self.content_hash_column) == content_hash and self.primary_key in row
-        ]
-        if existing_keys:
-            self.index.delete(primary_keys=existing_keys)
-
+        self._ensure_index_defaults_loaded()
         rows = [self._row_from_document(document, content_hash, filters) for document in documents]
         self.index.upsert(rows)
 
@@ -324,7 +323,7 @@ class DatabricksVectorDb(VectorDb):
         pass
 
     def get_supported_search_types(self) -> List[str]:
-        return [SearchType.vector, SearchType.hybrid]
+        return [SearchType.vector.value, SearchType.hybrid.value]
 
     def _row_from_document(
         self, document: Document, content_hash: str, filters: Optional[Dict[str, Any]] = None
@@ -337,11 +336,11 @@ class DatabricksVectorDb(VectorDb):
             metadata.update(filters)
 
         content_for_hash = document.content or ""
-        base_id = document.id or md5(content_for_hash.encode("utf-8")).hexdigest()
+        base_id = document.id or md5(content_for_hash.encode("utf-8", errors="surrogatepass")).hexdigest()
         primary_value = (
             base_id
             if document.id is not None
-            else md5(f"{base_id}_{content_hash}".encode("utf-8")).hexdigest()
+            else md5(f"{base_id}_{content_hash}".encode("utf-8", errors="surrogatepass")).hexdigest()
         )
 
         row: Dict[str, Any] = {
@@ -377,6 +376,10 @@ class DatabricksVectorDb(VectorDb):
             )
             return None
 
+        if not isinstance(filters, dict):
+            log_warning(f"Unsupported filter type: {type(filters).__name__}. Ignoring.")
+            return None
+
         provider_filters: Dict[str, Any] = {}
         for key, value in filters.items():
             if key in self.schema and key not in {
@@ -401,10 +404,6 @@ class DatabricksVectorDb(VectorDb):
             if get_filter_value(metadata, key) != value:
                 return False
         return True
-
-    def _documents_from_search_response(self, response: Any) -> List[Document]:
-        rows, _ = self._extract_rows_and_cursor(response)
-        return self._documents_from_rows(rows)
 
     def _documents_from_rows(self, rows: List[Dict[str, Any]]) -> List[Document]:
         documents: List[Document] = []
@@ -461,6 +460,7 @@ class DatabricksVectorDb(VectorDb):
         return metadata
 
     def _scan_all_rows(self) -> List[Dict[str, Any]]:
+        """Scan all rows in the index. WARNING: O(N) -- avoid on large indexes."""
         rows: List[Dict[str, Any]] = []
         last_primary_key = None
 
@@ -573,10 +573,21 @@ class DatabricksVectorDb(VectorDb):
         return rows
 
     def _infer_embedding_column(self, row: Dict[str, Any]) -> Optional[str]:
+        # Prefer the configured name if it exists and looks like an embedding
+        if self.embedding_vector_column in row:
+            value = row[self.embedding_vector_column]
+            if isinstance(value, list) and value and all(isinstance(v, (int, float)) for v in value):
+                return self.embedding_vector_column
+
+        # Fall back to the longest numeric list
+        best_col = None
+        best_len = 0
         for key, value in row.items():
-            if isinstance(value, list) and value and all(isinstance(item, (int, float)) for item in value):
-                return key
-        return None
+            if isinstance(value, list) and value and all(isinstance(v, (int, float)) for v in value):
+                if len(value) > best_len:
+                    best_col = key
+                    best_len = len(value)
+        return best_col
 
     def _infer_schema_type(self, value: Any) -> str:
         if isinstance(value, list):

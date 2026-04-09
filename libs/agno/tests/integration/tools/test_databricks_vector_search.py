@@ -22,6 +22,7 @@ def tools():
 def test_list_endpoints(tools):
     result = tools.list_endpoints(limit=10)
     assert isinstance(result, str)
+    assert not result.startswith("Error "), f"Tool returned error: {result}"
 
 
 @pytest.mark.skipif(
@@ -34,3 +35,4 @@ def test_list_endpoints(tools):
 def test_describe_index(tools):
     result = tools.describe_index()
     assert isinstance(result, str)
+    assert not result.startswith("Error "), f"Tool returned error: {result}"

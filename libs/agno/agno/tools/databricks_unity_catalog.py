@@ -93,7 +93,7 @@ class DatabricksUnityCatalogTools(Toolkit):
     def list_catalogs(self, include_browse: bool = False, limit: Optional[int] = None) -> str:
         """Use this function to list Unity Catalog catalogs."""
         try:
-            catalogs = self.client.catalogs.list(include_browse=include_browse, max_results=0)
+            catalogs = self.client.catalogs.list(include_browse=include_browse, max_results=limit or self.max_results)
             return json.dumps(self._serialize_items(catalogs, limit), default=str)
         except Exception as e:
             log_error(f"Error listing Databricks catalogs: {str(e)}")
@@ -108,7 +108,7 @@ class DatabricksUnityCatalogTools(Toolkit):
             schemas = self.client.schemas.list(
                 catalog_name=resolved_catalog,
                 include_browse=include_browse,
-                max_results=0,
+                max_results=limit or self.max_results,
             )
             return json.dumps(self._serialize_items(schemas, limit), default=str)
         except Exception as e:
@@ -132,7 +132,7 @@ class DatabricksUnityCatalogTools(Toolkit):
                 catalog_name=resolved_catalog,
                 schema_name=resolved_schema,
                 include_browse=include_browse,
-                max_results=0,
+                max_results=limit or self.max_results,
                 omit_columns=True,
                 omit_properties=True,
             )
@@ -178,7 +178,7 @@ class DatabricksUnityCatalogTools(Toolkit):
                 catalog_name=resolved_catalog,
                 schema_name=resolved_schema,
                 include_browse=include_browse,
-                max_results=0,
+                max_results=limit or self.max_results,
             )
             return json.dumps(self._serialize_items(functions, limit), default=str)
         except Exception as e:
@@ -211,7 +211,7 @@ class DatabricksUnityCatalogTools(Toolkit):
                 catalog_name=resolved_catalog,
                 schema_name=resolved_schema,
                 include_browse=include_browse,
-                max_results=0,
+                max_results=limit or self.max_results,
             )
             return json.dumps(self._serialize_items(volumes, limit), default=str)
         except Exception as e:

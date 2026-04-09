@@ -51,9 +51,10 @@ class _DatabricksSettingsData(BaseModel):
 
     @model_validator(mode="after")
     def resolve_workspace_url(self) -> "_DatabricksSettingsData":
-        normalized_host = self.host or self.workspace_url
-        self.host = normalized_host
-        self.workspace_url = normalized_host
+        if self.host and not self.workspace_url:
+            self.workspace_url = self.host
+        elif self.workspace_url and not self.host:
+            self.host = self.workspace_url
         return self
 
 
@@ -114,9 +115,10 @@ class DatabricksSettings(BaseSettings):
 
     @model_validator(mode="after")
     def resolve_workspace_url(self) -> "DatabricksSettings":
-        normalized_host = self.host or self.workspace_url
-        self.host = normalized_host
-        self.workspace_url = normalized_host
+        if self.host and not self.workspace_url:
+            self.workspace_url = self.host
+        elif self.workspace_url and not self.host:
+            self.host = self.workspace_url
         return self
 
     @property
@@ -146,6 +148,12 @@ class DatabricksSettings(BaseSettings):
                 **payload.get("default_headers", {}),
                 **normalized_overrides.pop("default_headers"),
             }
+
+        # Sync host/workspace_url when only one is overridden
+        if "host" in normalized_overrides and "workspace_url" not in normalized_overrides:
+            normalized_overrides["workspace_url"] = normalized_overrides["host"]
+        elif "workspace_url" in normalized_overrides and "host" not in normalized_overrides:
+            normalized_overrides["host"] = normalized_overrides["workspace_url"]
 
         payload.update(normalized_overrides)
         return self.__class__.from_values(**payload)

@@ -56,7 +56,7 @@ class Databricks(Model):
     request_params: Optional[Dict[str, Any]] = None
     default_headers: Optional[Dict[str, str]] = None
     role_map: Optional[Dict[str, str]] = None
-    include_stream_usage: bool = True
+    include_stream_usage: bool = False
 
     timeout: Optional[float] = None
     max_retries: Optional[int] = None
@@ -173,6 +173,10 @@ class Databricks(Model):
                 request_params["tool_choice"] = tool_choice
 
         if self.request_params:
+            critical_keys = {"model", "messages", "stream"}
+            overridden = critical_keys & self.request_params.keys()
+            if overridden:
+                log_warning(f"request_params overrides critical key(s): {', '.join(sorted(overridden))}")
             request_params.update(self.request_params)
 
         if request_params:
@@ -204,13 +208,17 @@ class Databricks(Model):
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Databricks":
-        return cls(**data)
+        import dataclasses
+
+        known_fields = {f.name for f in dataclasses.fields(cls)}
+        filtered = {k: v for k, v in data.items() if k in known_fields}
+        return cls(**filtered)
 
     def _format_message(self, message: Message, compress_tool_results: bool = False) -> Dict[str, Any]:
         tool_result = message.get_content(use_compressed_content=compress_tool_results)
 
         message_dict: Dict[str, Any] = {
-            "role": self.role_map[message.role] if self.role_map else self.default_role_map[message.role],
+            "role": (self.role_map or self.default_role_map).get(message.role, message.role),
             "content": tool_result,
             "name": message.name,
             "tool_call_id": message.tool_call_id,
@@ -236,7 +244,7 @@ class Databricks(Model):
             message_dict["audio"] = {"id": message.audio_output.id}
 
         if message.tool_calls is not None and len(message.tool_calls) == 0:
-            message_dict["tool_calls"] = None
+            message_dict.pop("tool_calls", None)
 
         if message.files is not None:
             content = message_dict.get("content")
@@ -251,7 +259,7 @@ class Databricks(Model):
                 if file_part:
                     message_dict["content"].insert(0, file_part)
 
-        if message.content is None:
+        if message.content is None and not isinstance(message_dict.get("content"), list):
             message_dict["content"] = ""
 
         return message_dict
@@ -327,6 +335,9 @@ class Databricks(Model):
             log_error(f"Error from Databricks API: {str(e)}")
             provider_error = ModelProviderError(message=str(e), model_name=self.name, model_id=self.id)
             raise ModelProviderError.classify(provider_error) from e
+        finally:
+            if assistant_message.metrics.timer is not None:
+                assistant_message.metrics.stop_timer()
 
     async def ainvoke(
         self,
@@ -363,6 +374,9 @@ class Databricks(Model):
             log_error(f"Error from Databricks API: {str(e)}")
             provider_error = ModelProviderError(message=str(e), model_name=self.name, model_id=self.id)
             raise ModelProviderError.classify(provider_error) from e
+        finally:
+            if assistant_message.metrics.timer is not None:
+                assistant_message.metrics.stop_timer()
 
     def invoke_stream(
         self,
@@ -401,6 +415,9 @@ class Databricks(Model):
             log_error(f"Error from Databricks API: {str(e)}")
             provider_error = ModelProviderError(message=str(e), model_name=self.name, model_id=self.id)
             raise ModelProviderError.classify(provider_error) from e
+        finally:
+            if assistant_message.metrics.timer is not None:
+                assistant_message.metrics.stop_timer()
 
     async def ainvoke_stream(
         self,
@@ -439,6 +456,9 @@ class Databricks(Model):
             log_error(f"Error from Databricks API: {str(e)}")
             provider_error = ModelProviderError(message=str(e), model_name=self.name, model_id=self.id)
             raise ModelProviderError.classify(provider_error) from e
+        finally:
+            if assistant_message.metrics.timer is not None:
+                assistant_message.metrics.stop_timer()
 
     def _parse_sse_line(self, line: str) -> Optional[ModelResponse]:
         if not line:
@@ -469,6 +489,15 @@ class Databricks(Model):
         response_format: Optional[Union[Dict, Type[BaseModel]]] = None,
     ) -> ModelResponse:
         model_response = ModelResponse()
+
+        if response is None:
+            return model_response
+        if not isinstance(response, dict):
+            raise ModelProviderError(
+                message=f"Unexpected response type from Databricks: {type(response).__name__}",
+                model_name=self.name,
+                model_id=self.id,
+            )
 
         if response.get("error"):
             error = response["error"]
@@ -597,7 +626,10 @@ class Databricks(Model):
             function_arguments = function.get("arguments")
 
             if len(tool_calls) <= index:
-                tool_calls.extend([{} for _ in range(index - len(tool_calls) + 1)])
+                tool_calls.extend([
+                    {"id": None, "type": None, "function": {"name": "", "arguments": ""}}
+                    for _ in range(index - len(tool_calls) + 1)
+                ])
 
             tool_call_entry = tool_calls[index]
             if not tool_call_entry:

@@ -25,6 +25,7 @@ def tools():
 def test_list_catalogs(tools):
     result = tools.list_catalogs(limit=10)
     assert isinstance(result, str)
+    assert not result.startswith("Error "), f"Tool returned error: {result}"
 
 
 @pytest.mark.skipif(
@@ -36,3 +37,4 @@ def test_list_catalogs(tools):
 def test_run_sql_query(tools):
     result = tools.run_sql_query("SELECT 1 AS ok", limit=5)
     assert isinstance(result, str)
+    assert not result.startswith("Error "), f"Tool returned error: {result}"

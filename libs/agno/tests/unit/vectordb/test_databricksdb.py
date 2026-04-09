@@ -159,8 +159,7 @@ def test_upsert_serializes_documents(vector_db, mock_embedder):
         )
     ]
 
-    with patch.object(vector_db, "_scan_all_rows", return_value=[]):
-        vector_db.upsert(content_hash="hash-1", documents=documents, filters={"tenant": "test"})
+    vector_db.upsert(content_hash="hash-1", documents=documents, filters={"tenant": "test"})
 
     mock_embedder.get_embedding_and_usage.assert_called_once_with("alpha content")
     vector_db.index.upsert.assert_called_once()

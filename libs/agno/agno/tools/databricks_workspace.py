@@ -180,11 +180,17 @@ class DatabricksWorkspaceTools(Toolkit):
             return admin_tools_disabled_error("DatabricksWorkspaceTools", "creating Databricks notebooks")
         try:
             _, workspace_service = _get_workspace_sdk()
+            language_upper = language.upper()
+            if not hasattr(workspace_service.Language, language_upper):
+                return f"Error creating Databricks notebook: unsupported language '{language}'"
+            file_format_upper = file_format.upper()
+            if not hasattr(workspace_service.ImportFormat, file_format_upper):
+                return f"Error creating Databricks notebook: unsupported format '{file_format}'"
             self.admin_client.workspace.import_(
                 path=path,
                 content=base64.b64encode(content.encode("utf-8")).decode("utf-8"),
-                format=getattr(workspace_service.ImportFormat, file_format.upper()),
-                language=getattr(workspace_service.Language, language.upper()),
+                format=getattr(workspace_service.ImportFormat, file_format_upper),
+                language=getattr(workspace_service.Language, language_upper),
                 overwrite=overwrite,
             )
             return json.dumps({"path": path, "created": True, "language": language.upper()})
@@ -205,10 +211,13 @@ class DatabricksWorkspaceTools(Toolkit):
             return admin_tools_disabled_error("DatabricksWorkspaceTools", "importing Databricks notebooks")
         try:
             _, workspace_service = _get_workspace_sdk()
+            file_format_upper = file_format.upper()
+            if not hasattr(workspace_service.ImportFormat, file_format_upper):
+                return f"Error importing Databricks notebook: unsupported format '{file_format}'"
             import_kwargs: Dict[str, Any] = {
                 "path": path,
                 "content": content_base64,
-                "format": getattr(workspace_service.ImportFormat, file_format.upper()),
+                "format": getattr(workspace_service.ImportFormat, file_format_upper),
                 "overwrite": overwrite,
             }
             if language is not None:
@@ -223,7 +232,10 @@ class DatabricksWorkspaceTools(Toolkit):
         """Use this function to export a Databricks notebook or workspace file."""
         try:
             _, workspace_service = _get_workspace_sdk()
-            response = self.client.workspace.export_(path=path, format=getattr(workspace_service.ExportFormat, file_format.upper()))
+            file_format_upper = file_format.upper()
+            if not hasattr(workspace_service.ExportFormat, file_format_upper):
+                return f"Error exporting Databricks notebook: unsupported format '{file_format}'"
+            response = self.client.workspace.export_(path=path, format=getattr(workspace_service.ExportFormat, file_format_upper))
             return json.dumps(self._serialize_item(response), default=str)
         except Exception as e:
             log_error(f"Error exporting Databricks notebook: {str(e)}")

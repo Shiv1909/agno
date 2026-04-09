@@ -1,6 +1,6 @@
 import json
 from os import getenv
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from agno.tools import Toolkit
 from agno.tools.databricks_tool_utils import build_workspace_client_kwargs, resolve_admin_settings
@@ -51,7 +51,7 @@ class DatabricksJobsAdminTools(Toolkit):
         self.azure_tenant_id = azure_tenant_id or getenv("DATABRICKS_AZURE_TENANT_ID")
         self._workspace_client = workspace_client
 
-        tools: list[Any] = [
+        tools: List[Any] = [
             self.create_job,
             self.update_job,
             self.delete_job,
@@ -95,7 +95,7 @@ class DatabricksJobsAdminTools(Toolkit):
             log_error(f"Error creating Databricks job: {str(e)}")
             return f"Error creating Databricks job: {e}"
 
-    def update_job(self, job_id: int, new_settings: Dict[str, Any], fields_to_remove: Optional[list[str]] = None) -> str:
+    def update_job(self, job_id: int, new_settings: Dict[str, Any], fields_to_remove: Optional[List[str]] = None) -> str:
         """Use this function to update a Databricks job using the Jobs update API."""
         try:
             self.client.jobs.update(

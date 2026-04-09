@@ -20,6 +20,7 @@ def tools():
 def test_list_jobs(tools):
     result = tools.list_jobs(limit=5)
     assert isinstance(result, str)
+    assert not result.startswith("Error "), f"Tool returned error: {result}"
 
 
 @pytest.mark.skipif(
@@ -31,3 +32,4 @@ def test_list_jobs(tools):
 def test_get_job(tools):
     result = tools.get_job(int(os.environ["DATABRICKS_JOB_ID"]))
     assert isinstance(result, str)
+    assert not result.startswith("Error "), f"Tool returned error: {result}"
