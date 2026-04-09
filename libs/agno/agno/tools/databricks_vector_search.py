@@ -22,7 +22,7 @@ SENSITIVE_FIELD_NAMES = {
 
 def _get_vector_search_client_cls():
     try:
-        from databricks.vector_search.client import VectorSearchClient
+        from databricks.vector_search.client import VectorSearchClient  # type: ignore[import-not-found,import-untyped]
     except ImportError as exc:
         raise ImportError(
             "`databricks-vectorsearch` not installed. Please install using `pip install databricks-vectorsearch`."
@@ -141,7 +141,7 @@ class DatabricksVectorSearchTools(Toolkit):
         )
 
     @property
-    def client(self):
+    def client(self) -> Any:
         if self._client is None:
             client_cls = _get_vector_search_client_cls()
             self._client = client_cls(
@@ -155,7 +155,7 @@ class DatabricksVectorSearchTools(Toolkit):
         return self._client
 
     @property
-    def admin_client(self):
+    def admin_client(self) -> Any:
         if not self.enable_admin_tools:
             raise RuntimeError(
                 admin_tools_disabled_error("DatabricksVectorSearchTools", "modifying Databricks vector search resources")

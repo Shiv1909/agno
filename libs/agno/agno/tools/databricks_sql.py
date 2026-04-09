@@ -30,7 +30,7 @@ BLOCKED_PREFIXES = (
 
 def _get_databricks_sql_module():
     try:
-        from databricks import sql
+        from databricks import sql  # type: ignore[import-not-found]
     except ImportError as exc:
         raise ImportError(
             "`databricks-sql-connector` not installed. Please install using `pip install databricks-sql-connector`."
@@ -101,7 +101,7 @@ class DatabricksSQLTools(Toolkit):
             **kwargs,
         )
 
-    def connect(self):
+    def connect(self) -> Any:
         """Establish a Databricks SQL connection."""
         if self._connection is not None:
             closed = getattr(self._connection, "closed", False)
@@ -141,7 +141,7 @@ class DatabricksSQLTools(Toolkit):
     def is_connected(self) -> bool:
         return self._connection is not None and not getattr(self._connection, "closed", False)
 
-    def _ensure_connection(self):
+    def _ensure_connection(self) -> Any:
         if not self.is_connected:
             return self.connect()
         return self._connection

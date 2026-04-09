@@ -9,7 +9,7 @@ from agno.utils.log import log_error
 
 def _get_workspace_client_cls():
     try:
-        from databricks.sdk import WorkspaceClient
+        from databricks.sdk import WorkspaceClient  # type: ignore[import-not-found]
     except ImportError as exc:
         raise ImportError("`databricks-sdk` not installed. Please install using `pip install databricks-sdk`.") from exc
     return WorkspaceClient
@@ -82,7 +82,7 @@ class DatabricksUnityCatalogTools(Toolkit):
         )
 
     @property
-    def client(self):
+    def client(self) -> Any:
         if self._workspace_client is None:
             client_cls = _get_workspace_client_cls()
             client_kwargs: Dict[str, Any] = {}

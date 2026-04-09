@@ -14,7 +14,7 @@ from agno.utils.log import log_error
 
 def _get_workspace_client_cls():
     try:
-        from databricks.sdk import WorkspaceClient
+        from databricks.sdk import WorkspaceClient  # type: ignore[import-not-found]
     except ImportError as exc:
         raise ImportError("`databricks-sdk` not installed. Please install using `pip install databricks-sdk`.") from exc
     return WorkspaceClient
@@ -103,7 +103,7 @@ class DatabricksJobsTools(Toolkit):
         )
 
     @property
-    def client(self):
+    def client(self) -> Any:
         if self._workspace_client is None:
             client_cls = _get_workspace_client_cls()
             self._workspace_client = client_cls(
@@ -112,7 +112,7 @@ class DatabricksJobsTools(Toolkit):
         return self._workspace_client
 
     @property
-    def admin_client(self):
+    def admin_client(self) -> Any:
         if not self.enable_admin_tools:
             raise RuntimeError(admin_tools_disabled_error("DatabricksJobsTools", "running Databricks jobs"))
 

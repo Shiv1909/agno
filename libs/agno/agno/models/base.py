@@ -20,6 +20,7 @@ from typing import (
     Tuple,
     Type,
     Union,
+    cast,
     get_args,
 )
 
@@ -2177,7 +2178,7 @@ class Model(ABC):
                                     function_call_output += str(item.content)
 
                         # Yield the event itself to bubble it up
-                        yield item
+                        yield cast(Any, item)
 
                     else:
                         function_call_output += str(item)
@@ -2832,7 +2833,7 @@ class Model(ABC):
                                 item.tool_call_id = function_call.call_id
 
                             # Yield the event itself to bubble it up
-                            yield item
+                            yield cast(Any, item)
                         else:
                             function_call_output += str(item)
                             if function_call.function.show_result and item is not None:

@@ -9,8 +9,8 @@ from agno.utils.log import log_error
 
 def _get_jobs_sdk():
     try:
-        from databricks.sdk import WorkspaceClient
-        from databricks.sdk.service import jobs as jobs_service
+        from databricks.sdk import WorkspaceClient  # type: ignore[import-not-found]
+        from databricks.sdk.service import jobs as jobs_service  # type: ignore[import-not-found]
     except ImportError as exc:
         raise ImportError("`databricks-sdk` not installed. Please install using `pip install databricks-sdk`.") from exc
     return WorkspaceClient, jobs_service
@@ -51,7 +51,7 @@ class DatabricksJobsAdminTools(Toolkit):
         self.azure_tenant_id = azure_tenant_id or getenv("DATABRICKS_AZURE_TENANT_ID")
         self._workspace_client = workspace_client
 
-        tools = [
+        tools: list[Any] = [
             self.create_job,
             self.update_job,
             self.delete_job,
@@ -74,9 +74,13 @@ class DatabricksJobsAdminTools(Toolkit):
         )
 
     @property
-    def client(self):
+    def client(self) -> Any:
         if self._workspace_client is None:
             workspace_client_cls, _ = _get_jobs_sdk()
+            if self.settings is None:
+                raise RuntimeError(
+                    "DatabricksJobsAdminTools requires validated admin settings before creating a workspace client."
+                )
             self._workspace_client = workspace_client_cls(
                 **build_workspace_client_kwargs(self.settings, azure_tenant_id=self.azure_tenant_id)
             )

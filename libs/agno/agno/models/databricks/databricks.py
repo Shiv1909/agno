@@ -54,8 +54,8 @@ class Databricks(Model):
     timeout: Optional[float] = None
     max_retries: Optional[int] = None
     settings: Optional[DatabricksSettings] = None
-    client: Optional[DatabricksClient] = None
-    async_client: Optional[AsyncDatabricksClient] = None
+    client: Optional[DatabricksClient] = None  # type: ignore[assignment]
+    async_client: Optional[AsyncDatabricksClient] = None  # type: ignore[assignment]
 
     default_role_map = {
         "system": "system",
@@ -525,8 +525,9 @@ class Databricks(Model):
                 if provider_data:
                     model_response.provider_data = provider_data
 
-            if delta.get("tool_calls") is not None:
-                model_response.tool_calls = delta.get("tool_calls")
+            delta_tool_calls = delta.get("tool_calls")
+            if isinstance(delta_tool_calls, list):
+                model_response.tool_calls = delta_tool_calls
 
             if delta.get("reasoning_content") is not None:
                 model_response.reasoning_content = delta.get("reasoning_content")

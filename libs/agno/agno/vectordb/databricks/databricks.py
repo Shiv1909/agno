@@ -15,7 +15,7 @@ from agno.vectordb.search import SearchType
 
 def _get_vector_search_client_cls():
     try:
-        from databricks.vector_search.client import VectorSearchClient
+        from databricks.vector_search.client import VectorSearchClient  # type: ignore[import-not-found,import-untyped]
     except ImportError as exc:
         raise ImportError(
             "`databricks-vectorsearch` not installed. Please install using `pip install databricks-vectorsearch`"
@@ -118,8 +118,8 @@ class DatabricksVectorDb(VectorDb):
             column_name for column_name in self.schema.keys() if column_name != self.embedding_vector_column
         ]
 
-        self._client = None
-        self._index = None
+        self._client: Optional[Any] = None
+        self._index: Optional[Any] = None
 
     def _default_schema(self) -> Dict[str, str]:
         return {
@@ -164,7 +164,7 @@ class DatabricksVectorDb(VectorDb):
         if self.embedding_dimension is None:
             raise ValueError("embedding_dimension or embedder.dimensions must be set before creating an index.")
 
-        self._index = self.client.create_direct_access_index(
+        created_index = self.client.create_direct_access_index(
             endpoint_name=self.endpoint_name,
             index_name=self.index_name,
             primary_key=self.primary_key,
@@ -173,9 +173,10 @@ class DatabricksVectorDb(VectorDb):
             schema=self.schema,
             embedding_model_endpoint_name=self.embedding_model_endpoint_name,
         )
+        self._index = created_index
 
-        if hasattr(self._index, "wait_until_ready"):
-            self._index.wait_until_ready(verbose=False)
+        if created_index is not None and hasattr(created_index, "wait_until_ready"):
+            created_index.wait_until_ready(verbose=False)
 
     async def async_create(self) -> None:
         await asyncio.to_thread(self.create)

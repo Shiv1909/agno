@@ -101,6 +101,8 @@ class AsyncDatabricksClient:
 
                 raise map_databricks_request_error(exc, operation=operation, base_url=self.base_url) from exc
 
+        raise RuntimeError(f"Databricks request loop exited unexpectedly for {operation}")
+
     async def request_json(
         self,
         method: str,
