@@ -105,7 +105,13 @@ def serialize_sdk_items(items: Any, limit: Optional[int], max_results: int) -> L
     if items is None:
         return []
     if isinstance(items, dict):
-        return [items]
+        for wrapper_key in ("endpoints", "indexes", "items", "elements", "results", "data"):
+            inner = items.get(wrapper_key)
+            if isinstance(inner, list):
+                items = inner
+                break
+        else:
+            return [items]
     effective_limit = max_results if limit is None else min(limit, max_results)
     serialized: List[Dict[str, Any]] = []
     for index, item in enumerate(items):

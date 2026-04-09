@@ -1,5 +1,7 @@
 from typing import Dict, Optional, Set
 
+from agno.utils.log import log_warning
+
 RETRYABLE_STATUS_CODES: Set[int] = {408, 409, 429, 500, 502, 503, 504}
 
 
@@ -10,6 +12,12 @@ def normalize_host(host: Optional[str]) -> Optional[str]:
     normalized = host.strip().rstrip("/")
     if normalized == "":
         return None
+
+    if normalized.startswith("http://"):
+        log_warning(
+            f"Databricks host uses http:// ({normalized}). "
+            "Consider using https:// for production environments."
+        )
 
     if not normalized.startswith(("http://", "https://")):
         normalized = f"https://{normalized}"

@@ -521,7 +521,7 @@ def from_dict(filter_dict: dict, _depth: int = 0) -> FilterExpr:
         >>> filter_expr = from_dict(filter_dict)
     """
     # Check recursion depth limit
-    if _depth > MAX_FILTER_DEPTH:
+    if _depth >= MAX_FILTER_DEPTH:
         raise ValueError(f"Filter expression exceeds maximum nesting depth of {MAX_FILTER_DEPTH}")
 
     if not isinstance(filter_dict, dict) or "op" not in filter_dict:

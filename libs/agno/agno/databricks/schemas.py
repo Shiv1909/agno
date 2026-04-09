@@ -1,11 +1,16 @@
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class DatabricksAPIError(BaseModel):
     error_code: Optional[str] = None
     code: Optional[str] = None
+
+    @field_validator("error_code", "code", mode="before")
+    @classmethod
+    def coerce_to_str(cls, v: Any) -> Optional[str]:
+        return str(v) if v is not None else None
     message: Optional[str] = None
     details: Optional[Any] = None
     raw: Optional[Any] = Field(default=None, exclude=True)  # Preserved for debugging; not serialized

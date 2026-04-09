@@ -117,14 +117,14 @@ class DatabricksEmbedder(Embedder):
         usage = response.get("usage")
         return usage if isinstance(usage, dict) else None
 
-    def _response(self, text: str) -> Dict[str, Any]:
+    def _response(self, text: str) -> Any:
         return self.get_client().request_json(
             "POST",
             "/serving-endpoints/embeddings",
             json=self._build_request_params(text),
         )
 
-    async def _async_response(self, text: str) -> Dict[str, Any]:
+    async def _async_response(self, text: str) -> Any:
         return await self.get_async_client().request_json(
             "POST",
             "/serving-endpoints/embeddings",

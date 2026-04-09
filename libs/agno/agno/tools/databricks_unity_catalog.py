@@ -97,7 +97,7 @@ class DatabricksUnityCatalogTools(Toolkit):
             return json.dumps(self._serialize_items(catalogs, limit), default=str)
         except Exception as e:
             log_error(f"Error listing Databricks catalogs: {str(e)}")
-            return f"Error listing Databricks catalogs: {e}"
+            return f"Error listing Databricks catalogs: An internal error occurred. Check server logs for details."
 
     def list_schemas(self, catalog_name: Optional[str] = None, include_browse: bool = False, limit: Optional[int] = None) -> str:
         """Use this function to list schemas under a Unity Catalog catalog."""
@@ -113,7 +113,7 @@ class DatabricksUnityCatalogTools(Toolkit):
             return json.dumps(self._serialize_items(schemas, limit), default=str)
         except Exception as e:
             log_error(f"Error listing Databricks schemas: {str(e)}")
-            return f"Error listing Databricks schemas: {e}"
+            return f"Error listing Databricks schemas: An internal error occurred. Check server logs for details."
 
     def list_tables(
         self,
@@ -139,7 +139,7 @@ class DatabricksUnityCatalogTools(Toolkit):
             return json.dumps(self._serialize_items(tables, limit), default=str)
         except Exception as e:
             log_error(f"Error listing Databricks tables: {str(e)}")
-            return f"Error listing Databricks tables: {e}"
+            return f"Error listing Databricks tables: An internal error occurred. Check server logs for details."
 
     def get_table_metadata(
         self,
@@ -159,7 +159,7 @@ class DatabricksUnityCatalogTools(Toolkit):
             return json.dumps(self._serialize_item(table), default=str)
         except Exception as e:
             log_error(f"Error getting Databricks table metadata: {str(e)}")
-            return f"Error getting Databricks table metadata: {e}"
+            return f"Error getting Databricks table metadata: An internal error occurred. Check server logs for details."
 
     def list_functions(
         self,
@@ -183,7 +183,7 @@ class DatabricksUnityCatalogTools(Toolkit):
             return json.dumps(self._serialize_items(functions, limit), default=str)
         except Exception as e:
             log_error(f"Error listing Databricks functions: {str(e)}")
-            return f"Error listing Databricks functions: {e}"
+            return f"Error listing Databricks functions: An internal error occurred. Check server logs for details."
 
     def get_function_metadata(self, full_name: str, include_browse: bool = False) -> str:
         """Use this function to fetch metadata for a Unity Catalog function."""
@@ -192,7 +192,7 @@ class DatabricksUnityCatalogTools(Toolkit):
             return json.dumps(self._serialize_item(function), default=str)
         except Exception as e:
             log_error(f"Error getting Databricks function metadata: {str(e)}")
-            return f"Error getting Databricks function metadata: {e}"
+            return f"Error getting Databricks function metadata: An internal error occurred. Check server logs for details."
 
     def list_volumes(
         self,
@@ -216,7 +216,7 @@ class DatabricksUnityCatalogTools(Toolkit):
             return json.dumps(self._serialize_items(volumes, limit), default=str)
         except Exception as e:
             log_error(f"Error listing Databricks volumes: {str(e)}")
-            return f"Error listing Databricks volumes: {e}"
+            return f"Error listing Databricks volumes: An internal error occurred. Check server logs for details."
 
     def _serialize_items(self, items, limit=None) -> List[Dict[str, Any]]:
         from agno.tools.databricks_tool_utils import serialize_sdk_items

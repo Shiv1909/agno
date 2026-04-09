@@ -56,7 +56,7 @@ class Databricks(Model):
     request_params: Optional[Dict[str, Any]] = None
     default_headers: Optional[Dict[str, str]] = None
     role_map: Optional[Dict[str, str]] = None
-    include_stream_usage: bool = False
+    include_stream_usage: bool = True
 
     timeout: Optional[float] = None
     max_retries: Optional[int] = None
@@ -76,6 +76,7 @@ class Databricks(Model):
         super().__post_init__()
         if self.endpoint is None:
             self.endpoint = self.id
+        self._warned_unsupported_params: set = set()
 
     def _get_settings(self) -> DatabricksSettings:
         overrides: Dict[str, Any] = {}
@@ -142,11 +143,13 @@ class Databricks(Model):
             "top_p": self.top_p,
         }
 
-        ignored_param_names = [name for name, value in ignored_params.items() if value is not None]
-        if ignored_param_names:
+        ignored_param_names = frozenset(name for name, value in ignored_params.items() if value is not None)
+        new_warnings = ignored_param_names - self._warned_unsupported_params
+        if new_warnings:
+            self._warned_unsupported_params.update(new_warnings)
             log_warning(
                 "Ignoring unsupported Databricks Chat Completions parameter(s): "
-                + ", ".join(sorted(ignored_param_names))
+                + ", ".join(sorted(new_warnings))
             )
 
         if response_format is not None:
@@ -494,6 +497,18 @@ class Databricks(Model):
         if response.get("error"):
             error = response["error"]
             message = error.get("message", "Unknown model error") if isinstance(error, dict) else str(error)
+            error_code = error.get("code") if isinstance(error, dict) else None
+            msg_lower = str(message).lower()
+            if (
+                error_code == "context_length_exceeded"
+                or "context_length_exceeded" in msg_lower
+                or "maximum context length" in msg_lower
+            ):
+                raise ContextWindowExceededError(
+                    message=message,
+                    model_name=self.name,
+                    model_id=self.id,
+                )
             raise ModelProviderError(message=message, model_name=self.name, model_id=self.id)
 
         choices = response.get("choices") or []
@@ -590,7 +605,7 @@ class Databricks(Model):
                     if audio_data is not None or audio_transcript is not None or audio_id is not None:
                         model_response.audio = Audio(
                             id=audio_id or str(uuid4()),
-                            content=audio_data or b"",
+                            content=audio_data or "",
                             expires_at=audio_expires_at,
                             transcript=audio_transcript,
                             sample_rate=24000,
@@ -633,7 +648,7 @@ class Databricks(Model):
                 }
             else:
                 if function_name:
-                    tool_call_entry["function"]["name"] += function_name
+                    tool_call_entry["function"]["name"] = function_name
                 if function_arguments:
                     tool_call_entry["function"]["arguments"] += function_arguments
                 if tool_call_id:

@@ -1,7 +1,7 @@
 import asyncio
 import json
-from hashlib import md5
-from typing import Any, Dict, List, Optional, Tuple, Union
+from hashlib import md5, sha256
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from agno.databricks.settings import DatabricksSettings
 from agno.filters import FilterExpr, get_filter_value, matches_filter_expr
@@ -57,6 +57,9 @@ class DatabricksVectorDb(VectorDb):
         schema: Optional[Dict[str, str]] = None,
         search_type: SearchType = SearchType.vector,
         scan_batch_size: int = 100,
+        max_scan_rows: int = 50_000,
+        upsert_batch_size: int = 100,
+        hash_algorithm: str = "md5",
         disable_notice: bool = True,
         name: Optional[str] = None,
         description: Optional[str] = None,
@@ -96,6 +99,9 @@ class DatabricksVectorDb(VectorDb):
         self.embedding_model_endpoint_name = embedding_model_endpoint_name
         self.search_type = search_type
         self.scan_batch_size = scan_batch_size
+        self.max_scan_rows = max_scan_rows
+        self.upsert_batch_size = upsert_batch_size
+        self.hash_algorithm = hash_algorithm
         self.disable_notice = disable_notice
         self.azure_tenant_id = azure_tenant_id
         self.azure_login_id = azure_login_id
@@ -213,7 +219,13 @@ class DatabricksVectorDb(VectorDb):
     ) -> None:
         await self.async_upsert(content_hash=content_hash, documents=documents, filters=filters)
 
-    def upsert(self, content_hash: str, documents: List[Document], filters: Optional[Dict[str, Any]] = None) -> None:
+    def upsert(
+        self,
+        content_hash: str,
+        documents: List[Document],
+        filters: Optional[Dict[str, Any]] = None,
+        cleanup_stale: bool = True,
+    ) -> None:
         if not documents:
             log_info("No documents to upsert")
             return
@@ -222,22 +234,24 @@ class DatabricksVectorDb(VectorDb):
         rows = [self._row_from_document(document, content_hash, filters) for document in documents]
         new_primary_keys = {row[self.primary_key] for row in rows if self.primary_key in row}
 
-        # Upsert first so data is never lost on failure
-        self.index.upsert(rows)
+        # Upsert in batches to avoid payload-too-large errors
+        for i in range(0, len(rows), self.upsert_batch_size):
+            self.index.upsert(rows[i : i + self.upsert_batch_size])
 
-        # Clean up stale rows with the same content_hash but different primary keys
-        try:
-            stale_keys = [
-                row[self.primary_key]
-                for row in self._scan_all_rows()
-                if row.get(self.content_hash_column) == content_hash
-                and self.primary_key in row
-                and row[self.primary_key] not in new_primary_keys
-            ]
-            if stale_keys:
-                self.index.delete(primary_keys=stale_keys)
-        except Exception as exc:
-            log_warning(f"Failed to clean up stale rows for content_hash={content_hash}: {exc}")
+        # Optionally clean up stale rows with the same content_hash but different primary keys
+        if cleanup_stale:
+            try:
+                stale_keys = [
+                    row[self.primary_key]
+                    for row in self._scan_all_rows()
+                    if row.get(self.content_hash_column) == content_hash
+                    and self.primary_key in row
+                    and row[self.primary_key] not in new_primary_keys
+                ]
+                if stale_keys:
+                    self.index.delete(primary_keys=stale_keys)
+            except Exception as exc:
+                log_warning(f"Failed to clean up stale rows for content_hash={content_hash}: {exc}")
 
     async def async_upsert(
         self, content_hash: str, documents: List[Document], filters: Optional[Dict[str, Any]] = None
@@ -259,10 +273,14 @@ class DatabricksVectorDb(VectorDb):
         if self.embedding_dimension is None:
             self.embedding_dimension = len(query_vector)
 
+        # Over-fetch when client-side filtering is active so we can still return `limit` results
+        is_client_side_filter = isinstance(filters, list)
+        fetch_limit = limit * 3 if is_client_side_filter else limit
+
         search_kwargs: Dict[str, Any] = {
             "columns": self.return_columns,
             "query_vector": query_vector,
-            "num_results": limit,
+            "num_results": fetch_limit,
             "filters": request_filters,
         }
         if self.similarity_threshold is not None:
@@ -276,7 +294,7 @@ class DatabricksVectorDb(VectorDb):
         response = self.index.similarity_search(**search_kwargs)
         rows, _ = self._extract_rows_and_cursor(response)
         filtered_rows = self._apply_client_side_filters(rows, filters)
-        return self._documents_from_rows(filtered_rows)
+        return self._documents_from_rows(filtered_rows[:limit])
 
     async def async_search(
         self,
@@ -320,8 +338,46 @@ class DatabricksVectorDb(VectorDb):
     def content_hash_exists(self, content_hash: str) -> bool:
         return any(row.get(self.content_hash_column) == content_hash for row in self._scan_all_rows())
 
+    async def async_delete(self) -> bool:
+        return await asyncio.to_thread(self.delete)
+
+    async def async_delete_by_id(self, id: str) -> bool:
+        return await asyncio.to_thread(self.delete_by_id, id)
+
+    async def async_delete_by_name(self, name: str) -> bool:
+        return await asyncio.to_thread(self.delete_by_name, name)
+
+    async def async_delete_by_metadata(self, metadata: Dict[str, Any]) -> bool:
+        return await asyncio.to_thread(self.delete_by_metadata, metadata)
+
+    async def async_delete_by_content_id(self, content_id: str) -> bool:
+        return await asyncio.to_thread(self.delete_by_content_id, content_id)
+
+    async def async_content_hash_exists(self, content_hash: str) -> bool:
+        return await asyncio.to_thread(self.content_hash_exists, content_hash)
+
+    async def async_id_exists(self, id: str) -> bool:
+        return await asyncio.to_thread(self.id_exists, id)
+
     def update_metadata(self, content_id: str, metadata: Dict[str, Any]) -> None:
-        rows_to_update = [row for row in self._scan_all_rows() if row.get(self.content_id_column) == content_id]
+        # Use a scan that includes the embedding vector so it survives re-upsert
+        scan_columns = list(set(self.return_columns + [self.embedding_vector_column]))
+        rows_to_update: List[Dict[str, Any]] = []
+        last_pk = None
+        while True:
+            try:
+                response = self.index.scan(num_results=self.scan_batch_size, last_primary_key=last_pk)
+            except Exception as exc:
+                log_warning(f"Failed to scan for update_metadata: {exc}")
+                break
+            batch, next_pk = self._extract_rows_and_cursor(response)
+            if not batch:
+                break
+            rows_to_update.extend(row for row in batch if row.get(self.content_id_column) == content_id)
+            if next_pk is None or next_pk == last_pk:
+                break
+            last_pk = next_pk
+
         if not rows_to_update:
             log_debug(f"No rows found for content_id: {content_id}")
             return
@@ -335,6 +391,9 @@ class DatabricksVectorDb(VectorDb):
             updated_rows.append(updated_row)
 
         self.index.upsert(updated_rows)
+
+    async def async_update_metadata(self, content_id: str, metadata: Dict[str, Any]) -> None:
+        await asyncio.to_thread(self.update_metadata, content_id, metadata)
 
     def optimize(self) -> None:
         pass
@@ -353,11 +412,12 @@ class DatabricksVectorDb(VectorDb):
             metadata.update(filters)
 
         content_for_hash = document.content or ""
-        base_id = document.id or md5(content_for_hash.encode("utf-8", errors="surrogatepass")).hexdigest()
+        hash_fn = sha256 if self.hash_algorithm == "sha256" else md5
+        base_id = document.id or hash_fn(content_for_hash.encode("utf-8", errors="surrogatepass")).hexdigest()[:32]
         primary_value = (
             base_id
             if document.id is not None
-            else md5(f"{base_id}_{content_hash}".encode("utf-8", errors="surrogatepass")).hexdigest()
+            else hash_fn(f"{base_id}_{content_hash}".encode("utf-8", errors="surrogatepass")).hexdigest()[:32]
         )
 
         row: Dict[str, Any] = {
@@ -486,8 +546,15 @@ class DatabricksVectorDb(VectorDb):
             batch_rows, next_primary_key = self._extract_rows_and_cursor(response)
             if not batch_rows:
                 break
+            # Check stuck cursor BEFORE extending to avoid duplicates
+            if next_primary_key is not None and next_primary_key == last_primary_key:
+                rows.extend(batch_rows)
+                break
             rows.extend(batch_rows)
-            if next_primary_key is None or next_primary_key == last_primary_key:
+            if next_primary_key is None:
+                break
+            if len(rows) >= self.max_scan_rows:
+                log_warning(f"Scan reached max_scan_rows limit ({self.max_scan_rows}). Results may be incomplete.")
                 break
             last_primary_key = next_primary_key
 

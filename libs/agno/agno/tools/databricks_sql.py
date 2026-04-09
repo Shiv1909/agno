@@ -1,4 +1,5 @@
 import json
+import threading
 from os import getenv
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
@@ -71,6 +72,7 @@ class DatabricksSQLTools(Toolkit):
         self.session_configuration = session_configuration or {}
         self.max_rows = max_rows
         self._connection = connection
+        self._connection_lock = threading.Lock()
 
         tools: List[Any] = []
         if enable_list_catalogs or all:
@@ -102,39 +104,41 @@ class DatabricksSQLTools(Toolkit):
 
     def connect(self) -> Any:
         """Establish a Databricks SQL connection."""
-        if self._connection is not None:
-            closed = getattr(self._connection, "closed", False)
-            if not closed:
-                log_debug("Connection already established, reusing existing Databricks SQL connection")
-                return self._connection
+        with self._connection_lock:
+            if self._connection is not None:
+                closed = getattr(self._connection, "closed", False)
+                if not closed:
+                    log_debug("Connection already established, reusing existing Databricks SQL connection")
+                    return self._connection
 
-        if not self.server_hostname:
-            raise ValueError("server_hostname is required to connect to Databricks SQL")
-        if not self.http_path:
-            raise ValueError("http_path is required to connect to Databricks SQL")
-        if not self.access_token:
-            raise ValueError("access_token is required to connect to Databricks SQL")
+            if not self.server_hostname:
+                raise ValueError("server_hostname is required to connect to Databricks SQL")
+            if not self.http_path:
+                raise ValueError("http_path is required to connect to Databricks SQL")
+            if not self.access_token:
+                raise ValueError("access_token is required to connect to Databricks SQL")
 
-        sql = _get_databricks_sql_module()
-        connection_kwargs: Dict[str, Any] = {
-            "server_hostname": self.server_hostname,
-            "http_path": self.http_path,
-            "access_token": self.access_token,
-        }
-        if self.session_configuration:
-            connection_kwargs["session_configuration"] = self.session_configuration
+            sql = _get_databricks_sql_module()
+            connection_kwargs: Dict[str, Any] = {
+                "server_hostname": self.server_hostname,
+                "http_path": self.http_path,
+                "access_token": self.access_token,
+            }
+            if self.session_configuration:
+                connection_kwargs["session_configuration"] = self.session_configuration
 
-        self._connection = sql.connect(**connection_kwargs)
-        return self._connection
+            self._connection = sql.connect(**connection_kwargs)
+            return self._connection
 
     def close(self) -> None:
         """Close the Databricks SQL connection."""
-        if self._connection is not None:
-            try:
-                self._connection.close()
-            except Exception:
-                pass
-            self._connection = None
+        with self._connection_lock:
+            if self._connection is not None:
+                try:
+                    self._connection.close()
+                except Exception:
+                    pass
+                self._connection = None
 
     @property
     def is_connected(self) -> bool:
@@ -155,7 +159,7 @@ class DatabricksSQLTools(Toolkit):
                 return json.dumps(rows, default=str)
         except Exception as e:
             log_error(f"Error listing Databricks catalogs: {str(e)}")
-            return f"Error listing Databricks catalogs: {e}"
+            return f"Error listing Databricks catalogs: An internal error occurred. Check server logs for details."
 
     def list_schemas(self, catalog_name: Optional[str] = None, limit: int = 100) -> str:
         """Use this function to list schemas in a Databricks catalog."""
@@ -167,7 +171,7 @@ class DatabricksSQLTools(Toolkit):
                 return json.dumps(rows, default=str)
         except Exception as e:
             log_error(f"Error listing Databricks schemas: {str(e)}")
-            return f"Error listing Databricks schemas: {e}"
+            return f"Error listing Databricks schemas: An internal error occurred. Check server logs for details."
 
     def list_tables(
         self,
@@ -189,7 +193,7 @@ class DatabricksSQLTools(Toolkit):
                 return json.dumps(rows, default=str)
         except Exception as e:
             log_error(f"Error listing Databricks tables: {str(e)}")
-            return f"Error listing Databricks tables: {e}"
+            return f"Error listing Databricks tables: An internal error occurred. Check server logs for details."
 
     def describe_table(
         self,
@@ -218,7 +222,7 @@ class DatabricksSQLTools(Toolkit):
                 return json.dumps(rows, default=str)
         except Exception as e:
             log_error(f"Error describing Databricks table: {str(e)}")
-            return f"Error describing Databricks table: {e}"
+            return f"Error describing Databricks table: An internal error occurred. Check server logs for details."
 
     def run_sql_query(self, query: str, limit: int = 100) -> str:
         """Use this function to run a read-only SQL query on Databricks SQL."""
@@ -228,9 +232,11 @@ class DatabricksSQLTools(Toolkit):
             with connection.cursor() as cursor:
                 cursor.execute(cleaned_query)
                 return self._format_query_result(cursor, limit)
+        except ValueError as e:
+            return f"Error running Databricks SQL query: {e}"
         except Exception as e:
             log_error(f"Error running Databricks SQL query: {str(e)}")
-            return f"Error running Databricks SQL query: {e}"
+            return f"Error running Databricks SQL query: An internal error occurred. Check server logs for details."
 
     def explain_sql_query(self, query: str, limit: int = 200) -> str:
         """Use this function to inspect the execution plan for a read-only SQL query."""
@@ -244,9 +250,11 @@ class DatabricksSQLTools(Toolkit):
             with connection.cursor() as cursor:
                 cursor.execute(f"EXPLAIN {stripped}")
                 return self._format_query_result(cursor, limit)
+        except ValueError as e:
+            return f"Error explaining Databricks SQL query: {e}"
         except Exception as e:
             log_error(f"Error explaining Databricks SQL query: {str(e)}")
-            return f"Error explaining Databricks SQL query: {e}"
+            return f"Error explaining Databricks SQL query: An internal error occurred. Check server logs for details."
 
     def _format_query_result(self, cursor: Any, limit: int) -> str:
         if cursor.description is None:
@@ -393,10 +401,17 @@ class DatabricksSQLTools(Toolkit):
                 continue
 
             if char == "/" and next_char == "*":
+                depth = 1
                 index += 2
-                while index + 1 < len(query) and not (query[index] == "*" and query[index + 1] == "/"):
-                    index += 1
-                index = min(index + 2, len(query))
+                while index + 1 < len(query) and depth > 0:
+                    if query[index] == "/" and query[index + 1] == "*":
+                        depth += 1
+                        index += 2
+                    elif query[index] == "*" and query[index + 1] == "/":
+                        depth -= 1
+                        index += 2
+                    else:
+                        index += 1
                 result.append(" ")
                 continue
 

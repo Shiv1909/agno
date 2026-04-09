@@ -62,16 +62,21 @@ class TestCommentBypasses:
         cleaned = _assert_allowed("SELECT 1 -- DROP TABLE t")
         assert "DROP" not in cleaned
 
-    def test_nested_block_comments_not_supported(self):
-        # SQL standard doesn't nest block comments. After first */, rest is live.
-        # "/* outer /* inner */ DROP TABLE t */ SELECT 1"
-        # After stripping the first /* ... */, we get: " DROP TABLE t */ SELECT 1"
-        # This should be blocked because the first keyword is DROP.
-        _assert_blocked("/* outer /* inner */ DROP TABLE t */ SELECT 1")
+    def test_nested_block_comments_supported(self):
+        # Nested block comments are now properly depth-tracked.
+        # "/* outer /* inner */ still_comment */ SELECT 1" -> entire comment stripped -> " SELECT 1"
+        cleaned = _assert_allowed("/* outer /* inner */ still_comment */ SELECT 1")
+        assert "outer" not in cleaned
+        assert "inner" not in cleaned
+        assert "still_comment" not in cleaned
 
     def test_block_comment_with_no_close(self):
-        # Unterminated block comment eats everything -> empty query
-        _assert_blocked("/* SELECT 1", "Query cannot be empty")
+        # Unterminated block comment: the scanner runs off the end.
+        # Depending on what remains after partial stripping, the query is either
+        # empty or has no recognizable statement keyword.
+        _assert_blocked("/* SELECT 1")
+        # Nested unterminated also blocked
+        _assert_blocked("/* outer /* inner */ still open")
 
     def test_only_comments(self):
         _assert_blocked("-- just a comment", "Query cannot be empty")

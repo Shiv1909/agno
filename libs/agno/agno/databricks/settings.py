@@ -6,6 +6,16 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from agno.databricks.utils import normalize_host
 
 
+def _get_default_user_agent() -> str:
+    try:
+        from importlib.metadata import version as pkg_version
+
+        ver = pkg_version("agno")
+    except Exception:
+        ver = "unknown"
+    return f"agno-databricks/{ver}"
+
+
 def _normalize_databricks_host(value: Optional[str]) -> Optional[str]:
     return normalize_host(value)
 
@@ -30,12 +40,12 @@ class _DatabricksSettingsData(BaseModel):
     workspace_url: Optional[str] = None
     token: Optional[str] = None
     client_id: Optional[str] = None
-    client_secret: Optional[str] = None
+    client_secret: Optional[str] = Field(default=None, repr=False)
     account_id: Optional[str] = None
     timeout: float = 60.0
     max_retries: int = 3
     default_headers: Dict[str, str] = Field(default_factory=dict)
-    user_agent: str = "agno-databricks/0.1"
+    user_agent: str = _get_default_user_agent()
 
     @field_validator("host", "workspace_url", mode="before")
     def validate_host(cls, value: Optional[str]) -> Optional[str]:
@@ -79,6 +89,7 @@ class DatabricksSettings(BaseSettings):
     client_secret: Optional[str] = Field(
         default=None,
         validation_alias="DATABRICKS_CLIENT_SECRET",
+        repr=False,
     )
     account_id: Optional[str] = Field(
         default=None,
@@ -93,7 +104,7 @@ class DatabricksSettings(BaseSettings):
         validation_alias="DATABRICKS_MAX_RETRIES",
     )
     default_headers: Dict[str, str] = Field(default_factory=dict)
-    user_agent: str = "agno-databricks/0.1"
+    user_agent: str = _get_default_user_agent()
 
     model_config = SettingsConfigDict(
         env_prefix="",
@@ -131,13 +142,25 @@ class DatabricksSettings(BaseSettings):
 
     @property
     def has_oauth_client_credentials(self) -> bool:
-        return all([self.client_id, self.client_secret])
+        return bool(
+            self.client_id and self.client_id.strip()
+            and self.client_secret and self.client_secret.strip()
+        )
 
     @classmethod
     def from_values(cls, **values: Any) -> "DatabricksSettings":
         payload = {key: value for key, value in values.items() if value is not None}
-        validated_payload = _DatabricksSettingsData.model_validate(payload).model_dump()
-        return cls.model_validate(validated_payload)
+        validated = _DatabricksSettingsData.model_validate(payload)
+        # Only pass explicitly-provided fields back to DatabricksSettings so that
+        # BaseSettings can still read environment variables for unset fields.
+        explicit_keys = set(payload.keys())
+        if "host" in explicit_keys:
+            explicit_keys.add("workspace_url")
+        if "workspace_url" in explicit_keys:
+            explicit_keys.add("host")
+        validated_dump = validated.model_dump()
+        filtered = {k: v for k, v in validated_dump.items() if k in explicit_keys}
+        return cls.model_validate(filtered)
 
     def with_overrides(self, **overrides: Any) -> "DatabricksSettings":
         payload = self.model_dump()

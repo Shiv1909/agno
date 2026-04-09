@@ -93,7 +93,7 @@ class DatabricksJobsAdminTools(Toolkit):
             return json.dumps(self._serialize_item(response), default=str)
         except Exception as e:
             log_error(f"Error creating Databricks job: {str(e)}")
-            return f"Error creating Databricks job: {e}"
+            return f"Error creating Databricks job: An internal error occurred. Check server logs for details."
 
     def update_job(self, job_id: int, new_settings: Dict[str, Any], fields_to_remove: Optional[List[str]] = None) -> str:
         """Use this function to update a Databricks job using the Jobs update API."""
@@ -106,7 +106,7 @@ class DatabricksJobsAdminTools(Toolkit):
             return json.dumps({"job_id": job_id, "updated": True})
         except Exception as e:
             log_error(f"Error updating Databricks job: {str(e)}")
-            return f"Error updating Databricks job: {e}"
+            return f"Error updating Databricks job: An internal error occurred. Check server logs for details."
 
     def delete_job(self, job_id: int) -> str:
         """Use this function to permanently delete a Databricks job."""
@@ -115,7 +115,7 @@ class DatabricksJobsAdminTools(Toolkit):
             return json.dumps({"job_id": job_id, "deleted": True})
         except Exception as e:
             log_error(f"Error deleting Databricks job: {str(e)}")
-            return f"Error deleting Databricks job: {e}"
+            return f"Error deleting Databricks job: An internal error occurred. Check server logs for details."
 
     def submit_one_time_run(self, run_settings: Dict[str, Any]) -> str:
         """Use this function to submit a one-time Databricks run without creating a persistent job."""
@@ -124,7 +124,7 @@ class DatabricksJobsAdminTools(Toolkit):
             return json.dumps(self._serialize_item(response), default=str)
         except Exception as e:
             log_error(f"Error submitting Databricks one-time run: {str(e)}")
-            return f"Error submitting Databricks one-time run: {e}"
+            return f"Error submitting Databricks one-time run: An internal error occurred. Check server logs for details."
 
     def _normalize_job_settings(self, settings: Dict[str, Any]) -> Dict[str, Any]:
         normalized = dict(settings)

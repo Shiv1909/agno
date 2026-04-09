@@ -132,7 +132,7 @@ class DatabricksJobsTools(Toolkit):
             return json.dumps(self._serialize_items(jobs_iter, limit), default=str)
         except Exception as e:
             log_error(f"Error listing Databricks jobs: {str(e)}")
-            return f"Error listing Databricks jobs: {e}"
+            return f"Error listing Databricks jobs: An internal error occurred. Check server logs for details."
 
     def get_job(self, job_id: int) -> str:
         """Use this function to fetch Databricks job metadata by job id."""
@@ -141,7 +141,7 @@ class DatabricksJobsTools(Toolkit):
             return json.dumps(self._serialize_item(job), default=str)
         except Exception as e:
             log_error(f"Error getting Databricks job: {str(e)}")
-            return f"Error getting Databricks job: {e}"
+            return f"Error getting Databricks job: An internal error occurred. Check server logs for details."
 
     def list_job_runs(
         self,
@@ -161,7 +161,7 @@ class DatabricksJobsTools(Toolkit):
             return json.dumps(self._serialize_items(runs_iter, limit), default=str)
         except Exception as e:
             log_error(f"Error listing Databricks job runs: {str(e)}")
-            return f"Error listing Databricks job runs: {e}"
+            return f"Error listing Databricks job runs: An internal error occurred. Check server logs for details."
 
     def get_job_run(self, run_id: int) -> str:
         """Use this function to fetch a Databricks run by run id."""
@@ -170,7 +170,7 @@ class DatabricksJobsTools(Toolkit):
             return json.dumps(self._serialize_item(run), default=str)
         except Exception as e:
             log_error(f"Error getting Databricks job run: {str(e)}")
-            return f"Error getting Databricks job run: {e}"
+            return f"Error getting Databricks job run: An internal error occurred. Check server logs for details."
 
     def run_job_now(
         self,
@@ -195,7 +195,7 @@ class DatabricksJobsTools(Toolkit):
             return json.dumps(self._serialize_item(response), default=str)
         except Exception as e:
             log_error(f"Error triggering Databricks job: {str(e)}")
-            return f"Error triggering Databricks job: {e}"
+            return f"Error triggering Databricks job: An internal error occurred. Check server logs for details."
 
     def cancel_job_run(self, run_id: int) -> str:
         """Use this function to cancel an active Databricks job run."""
@@ -206,7 +206,7 @@ class DatabricksJobsTools(Toolkit):
             return json.dumps(self._serialize_item(response), default=str)
         except Exception as e:
             log_error(f"Error cancelling Databricks job run: {str(e)}")
-            return f"Error cancelling Databricks job run: {e}"
+            return f"Error cancelling Databricks job run: An internal error occurred. Check server logs for details."
 
     def _serialize_items(self, items, limit=None) -> List[Dict[str, Any]]:
         from agno.tools.databricks_tool_utils import serialize_sdk_items
