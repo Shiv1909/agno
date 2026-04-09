@@ -91,6 +91,7 @@ mistral = ["mistralai"]
 ollama = ["ollama"]
 openai = ["openai"]
 portkey = ["portkey-ai"]
+databricks = ["databricks-sdk", "databricks-sql-connector", "databricks-vectorsearch"]
 
 # Dependencies for Token Counting
 tokenizers = ["tiktoken", "tokenizers"]
