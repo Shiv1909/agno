@@ -422,7 +422,21 @@ def matches_filter_expr(data: dict, expression: FilterExpr) -> bool:
             return False
 
     if isinstance(expression, NEQ):
-        return get_filter_value(data, expression.key) != expression.value
+        value = get_filter_value(data, expression.key)
+        if value is None and expression.key not in data:
+            # Check nested path too
+            parts = expression.key.split(".")
+            current = data
+            key_exists = True
+            for part in parts:
+                if isinstance(current, dict) and part in current:
+                    current = current[part]
+                else:
+                    key_exists = False
+                    break
+            if not key_exists:
+                return False
+        return value != expression.value
 
     if isinstance(expression, GTE):
         try:
@@ -441,6 +455,11 @@ def matches_filter_expr(data: dict, expression: FilterExpr) -> bool:
         if isinstance(value, str):
             return expression.value.lower() in value.lower()
         if isinstance(value, (list, tuple, set)):
+            if isinstance(expression.value, str):
+                search_lower = expression.value.lower()
+                return any(
+                    (isinstance(v, str) and v.lower() == search_lower) or v == expression.value for v in value
+                )
             return expression.value in value
         return False
 

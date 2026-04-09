@@ -159,7 +159,7 @@ def test_upsert_serializes_documents(vector_db, mock_embedder):
         )
     ]
 
-    with patch.object(vector_db, "content_hash_exists", return_value=False):
+    with patch.object(vector_db, "_scan_all_rows", return_value=[]):
         vector_db.upsert(content_hash="hash-1", documents=documents, filters={"tenant": "test"})
 
     mock_embedder.get_embedding_and_usage.assert_called_once_with("alpha content")
@@ -179,7 +179,6 @@ def test_search_parses_databricks_results_and_applies_client_side_filters(vector
         query_vector=[0.1, 0.2, 0.3],
         num_results=2,
         filters=None,
-        score_threshold=None,
         query_type="ANN",
     )
     assert len(results) == 1
@@ -203,7 +202,6 @@ def test_hybrid_search_pushes_supported_filters(vector_db, mock_embedder):
         query_vector=[0.1, 0.2, 0.3],
         num_results=2,
         filters={"tenant": "test"},
-        score_threshold=None,
         query_type="HYBRID",
         query_text="find ai docs",
     )
@@ -311,7 +309,6 @@ def test_search_auto_configures_delta_sync_indexes_from_live_style_scan(mock_vec
         query_vector=[0.1, 0.2, 0.3],
         num_results=1,
         filters=None,
-        score_threshold=None,
         query_type="ANN",
     )
 

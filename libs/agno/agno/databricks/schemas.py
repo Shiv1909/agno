@@ -8,7 +8,7 @@ class DatabricksAPIError(BaseModel):
     code: Optional[str] = None
     message: Optional[str] = None
     details: Optional[Any] = None
-    raw: Optional[Any] = Field(default=None, exclude=True)
+    raw: Optional[Any] = Field(default=None, exclude=True)  # Preserved for debugging; not serialized
 
     @classmethod
     def from_payload(cls, payload: Any) -> "DatabricksAPIError":

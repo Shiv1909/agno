@@ -211,8 +211,14 @@ class DatabricksVectorDb(VectorDb):
             log_info("No documents to upsert")
             return
 
-        if self.content_hash_exists(content_hash):
-            self._delete_by_content_hash(content_hash)
+        # Single scan: find and delete existing rows with matching content_hash
+        existing_keys = [
+            row[self.primary_key]
+            for row in self._scan_all_rows()
+            if row.get(self.content_hash_column) == content_hash and self.primary_key in row
+        ]
+        if existing_keys:
+            self.index.delete(primary_keys=existing_keys)
 
         rows = [self._row_from_document(document, content_hash, filters) for document in documents]
         self.index.upsert(rows)
@@ -242,8 +248,9 @@ class DatabricksVectorDb(VectorDb):
             "query_vector": query_vector,
             "num_results": limit,
             "filters": request_filters,
-            "score_threshold": self.similarity_threshold,
         }
+        if self.similarity_threshold is not None:
+            search_kwargs["score_threshold"] = self.similarity_threshold
         if self.search_type == SearchType.hybrid:
             search_kwargs["query_type"] = "HYBRID"
             search_kwargs["query_text"] = query
@@ -329,7 +336,8 @@ class DatabricksVectorDb(VectorDb):
         if filters:
             metadata.update(filters)
 
-        base_id = document.id or md5(document.content.encode("utf-8")).hexdigest()
+        content_for_hash = document.content or ""
+        base_id = document.id or md5(content_for_hash.encode("utf-8")).hexdigest()
         primary_value = (
             base_id
             if document.id is not None
@@ -355,6 +363,7 @@ class DatabricksVectorDb(VectorDb):
             elif key in metadata:
                 row[key] = metadata[key]
 
+        # Strip None values: Databricks vector search SDK rejects null fields in upsert payloads
         return {key: value for key, value in row.items() if value is not None}
 
     def _build_provider_filters(

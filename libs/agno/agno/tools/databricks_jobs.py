@@ -1,6 +1,6 @@
 import json
 from os import getenv
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, List, Optional
 
 from agno.databricks.settings import DatabricksSettings
 from agno.tools import Toolkit
@@ -42,7 +42,7 @@ class DatabricksJobsTools(Toolkit):
         enable_get_job_run: bool = True,
         enable_run_job_now: bool = True,
         enable_cancel_job_run: bool = True,
-        all: bool = False,
+        all: bool = False,  # noqa: A002
         **kwargs,
     ):
         self.settings = DatabricksSettings.from_values(
@@ -208,24 +208,10 @@ class DatabricksJobsTools(Toolkit):
             log_error(f"Error cancelling Databricks job run: {str(e)}")
             return f"Error cancelling Databricks job run: {e}"
 
-    def _serialize_items(self, items: Iterable[Any], limit: Optional[int]) -> List[Dict[str, Any]]:
-        effective_limit = self.max_results if limit is None else min(limit, self.max_results)
-        serialized: List[Dict[str, Any]] = []
-        for index, item in enumerate(items):
-            if index >= effective_limit:
-                break
-            serialized.append(self._serialize_item(item))
-        return serialized
+    def _serialize_items(self, items, limit=None) -> List[Dict[str, Any]]:
+        from agno.tools.databricks_tool_utils import serialize_sdk_items
+        return serialize_sdk_items(items, limit, self.max_results)
 
     def _serialize_item(self, item: Any) -> Dict[str, Any]:
-        if item is None:
-            return {}
-        if isinstance(item, dict):
-            return item
-        if hasattr(item, "as_dict") and callable(item.as_dict):
-            return item.as_dict()
-        if hasattr(item, "as_shallow_dict") and callable(item.as_shallow_dict):
-            return item.as_shallow_dict()
-        if hasattr(item, "__dict__"):
-            return {k: v for k, v in item.__dict__.items() if not k.startswith("_")}
-        return {"value": str(item)}
+        from agno.tools.databricks_tool_utils import serialize_sdk_item
+        return serialize_sdk_item(item)

@@ -59,7 +59,7 @@ class DatabricksSQLTools(Toolkit):
         enable_describe_table: bool = True,
         enable_run_sql_query: bool = True,
         enable_explain_sql_query: bool = True,
-        all: bool = False,
+        all: bool = False,  # noqa: A002
         **kwargs,
     ):
         self.server_hostname = self._normalize_server_hostname(
@@ -237,9 +237,13 @@ class DatabricksSQLTools(Toolkit):
         """Use this function to inspect the execution plan for a read-only SQL query."""
         try:
             cleaned_query = self._validate_read_only_query(query)
+            # Strip existing EXPLAIN prefix to avoid double-EXPLAIN
+            stripped = cleaned_query.strip()
+            if stripped.upper().startswith("EXPLAIN "):
+                stripped = stripped[len("EXPLAIN "):].strip()
             connection = self._ensure_connection()
             with connection.cursor() as cursor:
-                cursor.execute(f"EXPLAIN {cleaned_query}")
+                cursor.execute(f"EXPLAIN {stripped}")
                 return self._format_query_result(cursor, limit)
         except Exception as e:
             log_error(f"Error explaining Databricks SQL query: {str(e)}")

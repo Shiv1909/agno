@@ -1,6 +1,6 @@
 import json
 from os import getenv
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, List, Optional
 
 from agno.databricks.settings import DatabricksSettings
 from agno.tools import Toolkit
@@ -60,7 +60,7 @@ class DatabricksVectorSearchTools(Toolkit):
         enable_sync_index: bool = True,
         enable_upsert_vectors: bool = True,
         enable_delete_vectors: bool = True,
-        all: bool = False,
+        all: bool = False,  # noqa: A002
         **kwargs,
     ):
         self.settings = DatabricksSettings.from_values(
@@ -444,29 +444,14 @@ class DatabricksVectorSearchTools(Toolkit):
         client = self.admin_client if use_admin_client else self.client
         return client.get_index(endpoint_name=resolved_endpoint, index_name=resolved_index)
 
-    def _serialize_items(self, items: Iterable[Any], limit: Optional[int]) -> List[Dict[str, Any]]:
-        effective_limit = self.max_results if limit is None else min(limit, self.max_results)
-        serialized: List[Dict[str, Any]] = []
-        if isinstance(items, dict):
-            return [self._serialize_item(items)]
-        for index, item in enumerate(items):
-            if index >= effective_limit:
-                break
-            serialized.append(self._serialize_item(item))
-        return serialized
+    def _serialize_items(self, items, limit=None) -> List[Dict[str, Any]]:
+        from agno.tools.databricks_tool_utils import serialize_sdk_items
+        return serialize_sdk_items(items, limit, self.max_results)
 
     def _serialize_item(self, item: Any) -> Dict[str, Any]:
-        if item is None:
-            return {}
-        if isinstance(item, dict):
-            return self._sanitize_item(item)
-        if hasattr(item, "as_dict") and callable(item.as_dict):
-            return self._sanitize_item(item.as_dict())
-        if hasattr(item, "as_shallow_dict") and callable(item.as_shallow_dict):
-            return self._sanitize_item(item.as_shallow_dict())
-        if hasattr(item, "__dict__"):
-            return self._sanitize_item({k: v for k, v in item.__dict__.items() if not k.startswith("_")})
-        return {"value": self._sanitize_item(str(item))}
+        from agno.tools.databricks_tool_utils import serialize_sdk_item
+        result = serialize_sdk_item(item)
+        return self._sanitize_item(result)
 
     def _sanitize_item(self, value: Any) -> Any:
         if isinstance(value, dict):

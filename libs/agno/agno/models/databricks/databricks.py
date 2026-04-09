@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from agno.databricks.async_client import AsyncDatabricksClient
 from agno.databricks.client import DatabricksClient
 from agno.databricks.settings import DatabricksSettings
-from agno.exceptions import ModelAuthenticationError, ModelProviderError
+from agno.exceptions import ContextWindowExceededError, ModelAuthenticationError, ModelProviderError
 from agno.media import Audio
 from agno.models.base import Model
 from agno.models.message import Message
@@ -23,11 +23,17 @@ from agno.utils.reasoning import extract_thinking_content
 
 @dataclass
 class Databricks(Model):
+    """Databricks model provider for serving-endpoint chat completions.
+
+    Connects to Databricks Model Serving endpoints via the Databricks REST API.
+    Supports streaming, tool calling, and structured output via OpenAI-compatible API.
+    """
+
     id: str = "databricks-endpoint"
     name: str = "Databricks"
     provider: str = "Databricks"
-    supports_native_structured_outputs: bool = True
-    supports_json_schema_outputs: bool = True
+    supports_native_structured_outputs: bool = False
+    supports_json_schema_outputs: bool = False
 
     endpoint: Optional[str] = None
     host: Optional[str] = None
@@ -50,6 +56,7 @@ class Databricks(Model):
     request_params: Optional[Dict[str, Any]] = None
     default_headers: Optional[Dict[str, str]] = None
     role_map: Optional[Dict[str, str]] = None
+    include_stream_usage: bool = True
 
     timeout: Optional[float] = None
     max_retries: Optional[int] = None
@@ -71,45 +78,29 @@ class Databricks(Model):
             self.endpoint = self.id
 
     def _get_settings(self) -> DatabricksSettings:
+        overrides: Dict[str, Any] = {}
+        if self.host is not None:
+            overrides["host"] = self.host
+            if self.workspace_url is None:
+                overrides["workspace_url"] = self.host
+        if self.workspace_url is not None:
+            overrides["workspace_url"] = self.workspace_url
+        if self.token is not None:
+            overrides["token"] = self.token
+        if self.timeout is not None:
+            overrides["timeout"] = self.timeout
+        if self.max_retries is not None:
+            overrides["max_retries"] = self.max_retries
+        if self.default_headers is not None:
+            overrides["default_headers"] = self.default_headers
+
         if self.settings is None:
-            settings_kwargs: Dict[str, Any] = {}
-            if self.host is not None:
-                settings_kwargs["host"] = self.host
-                if self.workspace_url is None:
-                    settings_kwargs["workspace_url"] = self.host
-            if self.workspace_url is not None:
-                settings_kwargs["workspace_url"] = self.workspace_url
-            if self.token is not None:
-                settings_kwargs["token"] = self.token
-            if self.timeout is not None:
-                settings_kwargs["timeout"] = self.timeout
-            if self.max_retries is not None:
-                settings_kwargs["max_retries"] = self.max_retries
-            if self.default_headers is not None:
-                settings_kwargs["default_headers"] = self.default_headers
-            if settings_kwargs:
-                self.settings = DatabricksSettings.from_values(**settings_kwargs)
+            if overrides:
+                self.settings = DatabricksSettings.from_values(**overrides)
             else:
                 self.settings = DatabricksSettings()
-        else:
-            updates: Dict[str, Any] = {}
-            if self.host is not None:
-                updates["host"] = self.host
-                if self.workspace_url is None:
-                    updates["workspace_url"] = self.host
-            if self.workspace_url is not None:
-                updates["workspace_url"] = self.workspace_url
-            if self.token is not None:
-                updates["token"] = self.token
-            if self.timeout is not None:
-                updates["timeout"] = self.timeout
-            if self.max_retries is not None:
-                updates["max_retries"] = self.max_retries
-            if self.default_headers is not None:
-                updates["default_headers"] = self.default_headers
-
-            if updates:
-                self.settings = self.settings.with_overrides(**updates)
+        elif overrides:
+            self.settings = self.settings.with_overrides(**overrides)
 
         return self.settings
 
@@ -136,6 +127,7 @@ class Databricks(Model):
     ) -> Dict[str, Any]:
         ignored_params: Dict[str, Any] = {
             "frequency_penalty": self.frequency_penalty,
+            "logit_bias": self.logit_bias,
             "presence_penalty": self.presence_penalty,
             "seed": self.seed,
             "user": self.user,
@@ -236,6 +228,9 @@ class Databricks(Model):
                 if message.audio is not None:
                     message_dict["content"].extend(audio_to_message(audio=message.audio))
 
+        if message.videos is not None and len(message.videos) > 0:
+            log_warning("Video input is currently unsupported by Databricks.")
+
         if message.audio_output is not None:
             message_dict["content"] = ""
             message_dict["audio"] = {"id": message.audio_output.id}
@@ -294,7 +289,7 @@ class Databricks(Model):
             )
         )
 
-        if stream:
+        if stream and self.include_stream_usage:
             payload["stream_options"] = {"include_usage": True}
 
         return payload
@@ -322,13 +317,16 @@ class Databricks(Model):
             provider_response = self.get_client().request_json("POST", "/serving-endpoints/chat/completions", json=payload)
             assistant_message.metrics.stop_timer()
             return self._parse_provider_response(provider_response, response_format=response_format)
+        except ContextWindowExceededError:
+            raise
         except ModelAuthenticationError:
             raise
         except ModelProviderError:
             raise
         except Exception as e:
             log_error(f"Error from Databricks API: {str(e)}")
-            raise ModelProviderError(message=str(e), model_name=self.name, model_id=self.id) from e
+            provider_error = ModelProviderError(message=str(e), model_name=self.name, model_id=self.id)
+            raise ModelProviderError.classify(provider_error) from e
 
     async def ainvoke(
         self,
@@ -355,13 +353,16 @@ class Databricks(Model):
             )
             assistant_message.metrics.stop_timer()
             return self._parse_provider_response(provider_response, response_format=response_format)
+        except ContextWindowExceededError:
+            raise
         except ModelAuthenticationError:
             raise
         except ModelProviderError:
             raise
         except Exception as e:
             log_error(f"Error from Databricks API: {str(e)}")
-            raise ModelProviderError(message=str(e), model_name=self.name, model_id=self.id) from e
+            provider_error = ModelProviderError(message=str(e), model_name=self.name, model_id=self.id)
+            raise ModelProviderError.classify(provider_error) from e
 
     def invoke_stream(
         self,
@@ -390,13 +391,16 @@ class Databricks(Model):
                     if model_response is not None:
                         yield model_response
             assistant_message.metrics.stop_timer()
+        except ContextWindowExceededError:
+            raise
         except ModelAuthenticationError:
             raise
         except ModelProviderError:
             raise
         except Exception as e:
             log_error(f"Error from Databricks API: {str(e)}")
-            raise ModelProviderError(message=str(e), model_name=self.name, model_id=self.id) from e
+            provider_error = ModelProviderError(message=str(e), model_name=self.name, model_id=self.id)
+            raise ModelProviderError.classify(provider_error) from e
 
     async def ainvoke_stream(
         self,
@@ -425,13 +429,16 @@ class Databricks(Model):
                     if model_response is not None:
                         yield model_response
             assistant_message.metrics.stop_timer()
+        except ContextWindowExceededError:
+            raise
         except ModelAuthenticationError:
             raise
         except ModelProviderError:
             raise
         except Exception as e:
             log_error(f"Error from Databricks API: {str(e)}")
-            raise ModelProviderError(message=str(e), model_name=self.name, model_id=self.id) from e
+            provider_error = ModelProviderError(message=str(e), model_name=self.name, model_id=self.id)
+            raise ModelProviderError.classify(provider_error) from e
 
     def _parse_sse_line(self, line: str) -> Optional[ModelResponse]:
         if not line:

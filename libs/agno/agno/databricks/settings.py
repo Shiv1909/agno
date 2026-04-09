@@ -22,6 +22,9 @@ def _validate_databricks_max_retries(value: int) -> int:
     return value
 
 
+# Proxy model used by `from_values()` to validate & normalize user-supplied kwargs
+# before constructing the environment-aware DatabricksSettings. Kept separate because
+# BaseSettings would read env vars during validation, which we want to avoid here.
 class _DatabricksSettingsData(BaseModel):
     host: Optional[str] = None
     workspace_url: Optional[str] = None
@@ -57,35 +60,36 @@ class _DatabricksSettingsData(BaseModel):
 class DatabricksSettings(BaseSettings):
     host: Optional[str] = Field(
         default=None,
-        validation_alias=AliasChoices("DATABRICKS_HOST"),
+        validation_alias="DATABRICKS_HOST",
     )
     workspace_url: Optional[str] = Field(
         default=None,
-        validation_alias=AliasChoices("DATABRICKS_WORKSPACE_URL"),
+        validation_alias="DATABRICKS_WORKSPACE_URL",
     )
     token: Optional[str] = Field(
         default=None,
         validation_alias=AliasChoices("DATABRICKS_TOKEN", "DATABRICKS_PAT"),
+        repr=False,
     )
     client_id: Optional[str] = Field(
         default=None,
-        validation_alias=AliasChoices("DATABRICKS_CLIENT_ID"),
+        validation_alias="DATABRICKS_CLIENT_ID",
     )
     client_secret: Optional[str] = Field(
         default=None,
-        validation_alias=AliasChoices("DATABRICKS_CLIENT_SECRET"),
+        validation_alias="DATABRICKS_CLIENT_SECRET",
     )
     account_id: Optional[str] = Field(
         default=None,
-        validation_alias=AliasChoices("DATABRICKS_ACCOUNT_ID"),
+        validation_alias="DATABRICKS_ACCOUNT_ID",
     )
     timeout: float = Field(
         default=60.0,
-        validation_alias=AliasChoices("DATABRICKS_TIMEOUT"),
+        validation_alias="DATABRICKS_TIMEOUT",
     )
     max_retries: int = Field(
         default=3,
-        validation_alias=AliasChoices("DATABRICKS_MAX_RETRIES"),
+        validation_alias="DATABRICKS_MAX_RETRIES",
     )
     default_headers: Dict[str, str] = Field(default_factory=dict)
     user_agent: str = "agno-databricks/0.1"
@@ -131,7 +135,7 @@ class DatabricksSettings(BaseSettings):
     def from_values(cls, **values: Any) -> "DatabricksSettings":
         payload = {key: value for key, value in values.items() if value is not None}
         validated_payload = _DatabricksSettingsData.model_validate(payload).model_dump()
-        return cls.model_construct(**validated_payload)
+        return cls.model_validate(validated_payload)
 
     def with_overrides(self, **overrides: Any) -> "DatabricksSettings":
         payload = self.model_dump()

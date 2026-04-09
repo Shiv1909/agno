@@ -1,4 +1,6 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, Set
+
+RETRYABLE_STATUS_CODES: Set[int] = {408, 409, 429, 500, 502, 503, 504}
 
 
 def normalize_host(host: Optional[str]) -> Optional[str]:

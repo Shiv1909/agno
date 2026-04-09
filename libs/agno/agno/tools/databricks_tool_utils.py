@@ -1,5 +1,5 @@
 from os import getenv
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from agno.databricks.settings import DatabricksSettings
 
@@ -83,3 +83,31 @@ def admin_tools_disabled_error(toolkit_name: str, operation_name: str) -> str:
         f"Error {operation_name}: {toolkit_name} requires enable_admin_tools=True and explicit admin credentials "
         "to expose Databricks admin operations."
     )
+
+
+def serialize_sdk_item(item: Any) -> Dict[str, Any]:
+    """Serialize a Databricks SDK object to a dictionary."""
+    if item is None:
+        return {}
+    if isinstance(item, dict):
+        return item
+    if hasattr(item, "as_dict") and callable(item.as_dict):
+        return item.as_dict()
+    if hasattr(item, "as_shallow_dict") and callable(item.as_shallow_dict):
+        return item.as_shallow_dict()
+    if hasattr(item, "__dict__"):
+        return {k: v for k, v in item.__dict__.items() if not k.startswith("_")}
+    return {"value": str(item)}
+
+
+def serialize_sdk_items(items: Any, limit: Optional[int], max_results: int) -> List[Dict[str, Any]]:
+    """Serialize an iterable of Databricks SDK objects to a list of dictionaries."""
+    if isinstance(items, dict):
+        return [items]
+    effective_limit = max_results if limit is None else min(limit, max_results)
+    serialized: List[Dict[str, Any]] = []
+    for index, item in enumerate(items):
+        if index >= effective_limit:
+            break
+        serialized.append(serialize_sdk_item(item))
+    return serialized

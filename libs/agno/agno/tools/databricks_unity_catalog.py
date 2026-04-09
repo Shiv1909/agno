@@ -1,6 +1,6 @@
 import json
 from os import getenv
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, List, Optional
 
 from agno.databricks.settings import DatabricksSettings
 from agno.tools import Toolkit
@@ -36,7 +36,7 @@ class DatabricksUnityCatalogTools(Toolkit):
         enable_list_functions: bool = True,
         enable_get_function_metadata: bool = True,
         enable_list_volumes: bool = True,
-        all: bool = False,
+        all: bool = False,  # noqa: A002
         **kwargs,
     ):
         self.settings = DatabricksSettings.from_values(
@@ -84,18 +84,9 @@ class DatabricksUnityCatalogTools(Toolkit):
     @property
     def client(self) -> Any:
         if self._workspace_client is None:
+            from agno.tools.databricks_tool_utils import build_workspace_client_kwargs
             client_cls = _get_workspace_client_cls()
-            client_kwargs: Dict[str, Any] = {}
-            if self.settings.host:
-                client_kwargs["host"] = self.settings.host
-            if self.settings.token:
-                client_kwargs["token"] = self.settings.token
-            if self.settings.client_id:
-                client_kwargs["client_id"] = self.settings.client_id
-            if self.settings.client_secret:
-                client_kwargs["client_secret"] = self.settings.client_secret
-            if self.azure_tenant_id:
-                client_kwargs["azure_tenant_id"] = self.azure_tenant_id
+            client_kwargs = build_workspace_client_kwargs(self.settings, azure_tenant_id=self.azure_tenant_id)
             self._workspace_client = client_cls(**client_kwargs)
         return self._workspace_client
 
@@ -227,24 +218,10 @@ class DatabricksUnityCatalogTools(Toolkit):
             log_error(f"Error listing Databricks volumes: {str(e)}")
             return f"Error listing Databricks volumes: {e}"
 
-    def _serialize_items(self, items: Iterable[Any], limit: Optional[int]) -> List[Dict[str, Any]]:
-        effective_limit = self.max_results if limit is None else min(limit, self.max_results)
-        serialized: List[Dict[str, Any]] = []
-        for index, item in enumerate(items):
-            if index >= effective_limit:
-                break
-            serialized.append(self._serialize_item(item))
-        return serialized
+    def _serialize_items(self, items, limit=None) -> List[Dict[str, Any]]:
+        from agno.tools.databricks_tool_utils import serialize_sdk_items
+        return serialize_sdk_items(items, limit, self.max_results)
 
     def _serialize_item(self, item: Any) -> Dict[str, Any]:
-        if item is None:
-            return {}
-        if isinstance(item, dict):
-            return item
-        if hasattr(item, "as_dict") and callable(item.as_dict):
-            return item.as_dict()
-        if hasattr(item, "as_shallow_dict") and callable(item.as_shallow_dict):
-            return item.as_shallow_dict()
-        if hasattr(item, "__dict__"):
-            return {k: v for k, v in item.__dict__.items() if not k.startswith("_")}
-        return {"value": str(item)}
+        from agno.tools.databricks_tool_utils import serialize_sdk_item
+        return serialize_sdk_item(item)

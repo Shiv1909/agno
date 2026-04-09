@@ -194,14 +194,5 @@ class DatabricksJobsAdminTools(Toolkit):
         return normalized
 
     def _serialize_item(self, item: Any) -> Dict[str, Any]:
-        if item is None:
-            return {}
-        if isinstance(item, dict):
-            return item
-        if hasattr(item, "as_dict") and callable(item.as_dict):
-            return item.as_dict()
-        if hasattr(item, "as_shallow_dict") and callable(item.as_shallow_dict):
-            return item.as_shallow_dict()
-        if hasattr(item, "__dict__"):
-            return {k: v for k, v in item.__dict__.items() if not k.startswith("_")}
-        return {"value": str(item)}
+        from agno.tools.databricks_tool_utils import serialize_sdk_item
+        return serialize_sdk_item(item)
