@@ -46,7 +46,10 @@ class DatabricksEmbedder(Embedder):
                 settings_kwargs["max_retries"] = self.max_retries
             if self.default_headers is not None:
                 settings_kwargs["default_headers"] = self.default_headers
-            self.settings = DatabricksSettings.from_values(**settings_kwargs)
+            if settings_kwargs:
+                self.settings = DatabricksSettings.from_values(**settings_kwargs)
+            else:
+                self.settings = DatabricksSettings()
         else:
             updates: Dict[str, Any] = {}
             if self.host is not None:

@@ -27,14 +27,19 @@ class DatabricksClient:
         default_headers: Optional[Dict[str, str]] = None,
         http_client: Optional[httpx.Client] = None,
     ):
-        self.settings = settings or DatabricksSettings.from_values(
-            host=host,
-            workspace_url=workspace_url,
-            token=token,
-            timeout=timeout or 60.0,
-            max_retries=max_retries if max_retries is not None else 3,
-            default_headers=default_headers or {},
-        )
+        if settings is not None:
+            self.settings = settings
+        elif any(value is not None for value in [host, workspace_url, token, timeout, max_retries, default_headers]):
+            self.settings = DatabricksSettings.from_values(
+                host=host,
+                workspace_url=workspace_url,
+                token=token,
+                timeout=timeout or 60.0,
+                max_retries=max_retries if max_retries is not None else 3,
+                default_headers=default_headers or {},
+            )
+        else:
+            self.settings = DatabricksSettings()
         self.http_client = http_client
 
     @property

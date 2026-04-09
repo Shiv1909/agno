@@ -1,9 +1,57 @@
 from typing import Any, Dict, Optional
 
-from pydantic import AliasChoices, Field, field_validator, model_validator
+from pydantic import AliasChoices, BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from agno.databricks.utils import normalize_host
+
+
+def _normalize_databricks_host(value: Optional[str]) -> Optional[str]:
+    return normalize_host(value)
+
+
+def _validate_databricks_timeout(value: float) -> float:
+    if value <= 0:
+        raise ValueError("timeout must be greater than 0")
+    return value
+
+
+def _validate_databricks_max_retries(value: int) -> int:
+    if value < 0:
+        raise ValueError("max_retries must be greater than or equal to 0")
+    return value
+
+
+class _DatabricksSettingsData(BaseModel):
+    host: Optional[str] = None
+    workspace_url: Optional[str] = None
+    token: Optional[str] = None
+    client_id: Optional[str] = None
+    client_secret: Optional[str] = None
+    account_id: Optional[str] = None
+    timeout: float = 60.0
+    max_retries: int = 3
+    default_headers: Dict[str, str] = Field(default_factory=dict)
+    user_agent: str = "agno-databricks/0.1"
+
+    @field_validator("host", "workspace_url", mode="before")
+    def validate_host(cls, value: Optional[str]) -> Optional[str]:
+        return _normalize_databricks_host(value)
+
+    @field_validator("timeout")
+    def validate_timeout(cls, value: float) -> float:
+        return _validate_databricks_timeout(value)
+
+    @field_validator("max_retries")
+    def validate_max_retries(cls, value: int) -> int:
+        return _validate_databricks_max_retries(value)
+
+    @model_validator(mode="after")
+    def resolve_workspace_url(self) -> "_DatabricksSettingsData":
+        normalized_host = self.host or self.workspace_url
+        self.host = normalized_host
+        self.workspace_url = normalized_host
+        return self
 
 
 class DatabricksSettings(BaseSettings):
@@ -50,19 +98,15 @@ class DatabricksSettings(BaseSettings):
 
     @field_validator("host", "workspace_url", mode="before")
     def validate_host(cls, value: Optional[str]) -> Optional[str]:
-        return normalize_host(value)
+        return _normalize_databricks_host(value)
 
     @field_validator("timeout")
     def validate_timeout(cls, value: float) -> float:
-        if value <= 0:
-            raise ValueError("timeout must be greater than 0")
-        return value
+        return _validate_databricks_timeout(value)
 
     @field_validator("max_retries")
     def validate_max_retries(cls, value: int) -> int:
-        if value < 0:
-            raise ValueError("max_retries must be greater than or equal to 0")
-        return value
+        return _validate_databricks_max_retries(value)
 
     @model_validator(mode="after")
     def resolve_workspace_url(self) -> "DatabricksSettings":
@@ -86,7 +130,8 @@ class DatabricksSettings(BaseSettings):
     @classmethod
     def from_values(cls, **values: Any) -> "DatabricksSettings":
         payload = {key: value for key, value in values.items() if value is not None}
-        return cls.model_validate(payload)
+        validated_payload = _DatabricksSettingsData.model_validate(payload).model_dump()
+        return cls.model_construct(**validated_payload)
 
     def with_overrides(self, **overrides: Any) -> "DatabricksSettings":
         payload = self.model_dump()

@@ -36,6 +36,22 @@ def test_databricks_settings_resolve_workspace_url():
     assert settings.workspace_url == "https://workspace.cloud.databricks.com"
 
 
+def test_databricks_settings_from_values_prefers_explicit_values_over_env(monkeypatch):
+    monkeypatch.setenv("DATABRICKS_HOST", "https://env.cloud.databricks.com")
+    monkeypatch.setenv("DATABRICKS_TOKEN", "env-token")
+
+    settings = DatabricksSettings.from_values(
+        host="https://explicit.cloud.databricks.com",
+        token="explicit-token",
+        default_headers={"X-Test": "1"},
+    )
+
+    assert settings.host == "https://explicit.cloud.databricks.com"
+    assert settings.workspace_url == "https://explicit.cloud.databricks.com"
+    assert settings.token == "explicit-token"
+    assert settings.default_headers["X-Test"] == "1"
+
+
 def test_databricks_settings_with_overrides_revalidates_values():
     settings = DatabricksSettings(host="https://env.cloud.databricks.com", token="token")
 
