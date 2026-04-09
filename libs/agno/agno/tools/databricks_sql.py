@@ -320,7 +320,12 @@ class DatabricksSQLTools(Toolkit):
         if statement_keyword == "EXPLAIN":
             explain_scanner = _SQLScanner(cleaned_query)
             explain_scanner.read_keyword()  # consume EXPLAIN
+            # Skip EXPLAIN modifiers (ANALYZE, FORMATTED, EXTENDED, CODEGEN, COST)
+            # and check the actual statement keyword that follows
+            explain_modifiers = {"ANALYZE", "FORMATTED", "EXTENDED", "CODEGEN", "COST"}
             inner_keyword = explain_scanner.read_keyword()
+            while inner_keyword is not None and inner_keyword in explain_modifiers:
+                inner_keyword = explain_scanner.read_keyword()
             if inner_keyword is not None and inner_keyword in BLOCKED_PREFIXES:
                 raise ValueError("Only read-only SQL statements are allowed")
         if statement_keyword not in {"SELECT", "SHOW", "DESCRIBE", "DESC", "EXPLAIN"}:

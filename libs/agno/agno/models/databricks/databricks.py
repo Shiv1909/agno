@@ -312,8 +312,8 @@ class Databricks(Model):
         run_response: Optional[Union[RunOutput, TeamRunOutput]] = None,
         compress_tool_results: bool = False,
     ) -> ModelResponse:
+        assistant_message.metrics.start_timer()
         try:
-            assistant_message.metrics.start_timer()
             payload = self._build_payload(
                 messages,
                 response_format=response_format,
@@ -323,7 +323,6 @@ class Databricks(Model):
                 compress_tool_results=compress_tool_results,
             )
             provider_response = self.get_client().request_json("POST", "/serving-endpoints/chat/completions", json=payload)
-            assistant_message.metrics.stop_timer()
             return self._parse_provider_response(provider_response, response_format=response_format)
         except ContextWindowExceededError:
             raise
@@ -336,8 +335,7 @@ class Databricks(Model):
             provider_error = ModelProviderError(message=str(e), model_name=self.name, model_id=self.id)
             raise ModelProviderError.classify(provider_error) from e
         finally:
-            if assistant_message.metrics.timer is not None:
-                assistant_message.metrics.stop_timer()
+            assistant_message.metrics.stop_timer()
 
     async def ainvoke(
         self,
@@ -349,8 +347,8 @@ class Databricks(Model):
         run_response: Optional[Union[RunOutput, TeamRunOutput]] = None,
         compress_tool_results: bool = False,
     ) -> ModelResponse:
+        assistant_message.metrics.start_timer()
         try:
-            assistant_message.metrics.start_timer()
             payload = self._build_payload(
                 messages,
                 response_format=response_format,
@@ -362,7 +360,6 @@ class Databricks(Model):
             provider_response = await self.get_async_client().request_json(
                 "POST", "/serving-endpoints/chat/completions", json=payload
             )
-            assistant_message.metrics.stop_timer()
             return self._parse_provider_response(provider_response, response_format=response_format)
         except ContextWindowExceededError:
             raise
@@ -375,8 +372,7 @@ class Databricks(Model):
             provider_error = ModelProviderError(message=str(e), model_name=self.name, model_id=self.id)
             raise ModelProviderError.classify(provider_error) from e
         finally:
-            if assistant_message.metrics.timer is not None:
-                assistant_message.metrics.stop_timer()
+            assistant_message.metrics.stop_timer()
 
     def invoke_stream(
         self,
@@ -388,8 +384,8 @@ class Databricks(Model):
         run_response: Optional[Union[RunOutput, TeamRunOutput]] = None,
         compress_tool_results: bool = False,
     ) -> Iterator[ModelResponse]:
+        assistant_message.metrics.start_timer()
         try:
-            assistant_message.metrics.start_timer()
             payload = self._build_payload(
                 messages,
                 response_format=response_format,
@@ -404,7 +400,6 @@ class Databricks(Model):
                     model_response = self._parse_sse_line(line)
                     if model_response is not None:
                         yield model_response
-            assistant_message.metrics.stop_timer()
         except ContextWindowExceededError:
             raise
         except ModelAuthenticationError:
@@ -416,8 +411,7 @@ class Databricks(Model):
             provider_error = ModelProviderError(message=str(e), model_name=self.name, model_id=self.id)
             raise ModelProviderError.classify(provider_error) from e
         finally:
-            if assistant_message.metrics.timer is not None:
-                assistant_message.metrics.stop_timer()
+            assistant_message.metrics.stop_timer()
 
     async def ainvoke_stream(
         self,
@@ -429,8 +423,8 @@ class Databricks(Model):
         run_response: Optional[Union[RunOutput, TeamRunOutput]] = None,
         compress_tool_results: bool = False,
     ) -> AsyncIterator[ModelResponse]:
+        assistant_message.metrics.start_timer()
         try:
-            assistant_message.metrics.start_timer()
             payload = self._build_payload(
                 messages,
                 response_format=response_format,
@@ -445,7 +439,6 @@ class Databricks(Model):
                     model_response = self._parse_sse_line(line)
                     if model_response is not None:
                         yield model_response
-            assistant_message.metrics.stop_timer()
         except ContextWindowExceededError:
             raise
         except ModelAuthenticationError:
@@ -457,8 +450,7 @@ class Databricks(Model):
             provider_error = ModelProviderError(message=str(e), model_name=self.name, model_id=self.id)
             raise ModelProviderError.classify(provider_error) from e
         finally:
-            if assistant_message.metrics.timer is not None:
-                assistant_message.metrics.stop_timer()
+            assistant_message.metrics.stop_timer()
 
     def _parse_sse_line(self, line: str) -> Optional[ModelResponse]:
         if not line:

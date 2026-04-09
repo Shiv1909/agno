@@ -220,7 +220,24 @@ class DatabricksVectorDb(VectorDb):
 
         self._ensure_index_defaults_loaded()
         rows = [self._row_from_document(document, content_hash, filters) for document in documents]
+        new_primary_keys = {row[self.primary_key] for row in rows if self.primary_key in row}
+
+        # Upsert first so data is never lost on failure
         self.index.upsert(rows)
+
+        # Clean up stale rows with the same content_hash but different primary keys
+        try:
+            stale_keys = [
+                row[self.primary_key]
+                for row in self._scan_all_rows()
+                if row.get(self.content_hash_column) == content_hash
+                and self.primary_key in row
+                and row[self.primary_key] not in new_primary_keys
+            ]
+            if stale_keys:
+                self.index.delete(primary_keys=stale_keys)
+        except Exception as exc:
+            log_warning(f"Failed to clean up stale rows for content_hash={content_hash}: {exc}")
 
     async def async_upsert(
         self, content_hash: str, documents: List[Document], filters: Optional[Dict[str, Any]] = None
