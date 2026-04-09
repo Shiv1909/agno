@@ -151,8 +151,6 @@ class DatabricksSettings(BaseSettings):
     def from_values(cls, **values: Any) -> "DatabricksSettings":
         payload = {key: value for key, value in values.items() if value is not None}
         validated = _DatabricksSettingsData.model_validate(payload)
-        # Only pass explicitly-provided fields back to DatabricksSettings so that
-        # BaseSettings can still read environment variables for unset fields.
         explicit_keys = set(payload.keys())
         if "host" in explicit_keys:
             explicit_keys.add("workspace_url")
@@ -160,7 +158,13 @@ class DatabricksSettings(BaseSettings):
             explicit_keys.add("host")
         validated_dump = validated.model_dump()
         filtered = {k: v for k, v in validated_dump.items() if k in explicit_keys}
-        return cls(**filtered)
+        # Build a complete dict: env-var baseline + explicit overrides.
+        # Using model_construct avoids BaseSettings re-reading env vars
+        # via validation_alias, which would override explicit values.
+        baseline = cls()
+        merged = baseline.model_dump()
+        merged.update(filtered)
+        return cls.model_construct(**merged)
 
     def with_overrides(self, **overrides: Any) -> "DatabricksSettings":
         payload = self.model_dump()
