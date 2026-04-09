@@ -93,7 +93,7 @@ class DatabricksVectorDb(VectorDb):
         self.azure_tenant_id = azure_tenant_id
         self.azure_login_id = azure_login_id
 
-        self.settings = DatabricksSettings(
+        self.settings = DatabricksSettings.from_values(
             host=host,
             workspace_url=workspace_url,
             token=token,

@@ -70,7 +70,7 @@ def resolve_admin_settings(
                 f"{toolkit_name} requires explicit admin credentials via admin_token or admin_client_id/admin_client_secret when enable_admin_tools=True."
             )
 
-    return DatabricksSettings(
+    return DatabricksSettings.from_values(
         host=host,
         token=resolved_admin_token,
         client_id=resolved_admin_client_id,

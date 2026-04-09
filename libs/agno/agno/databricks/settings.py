@@ -83,6 +83,11 @@ class DatabricksSettings(BaseSettings):
     def has_oauth_client_credentials(self) -> bool:
         return all([self.client_id, self.client_secret])
 
+    @classmethod
+    def from_values(cls, **values: Any) -> "DatabricksSettings":
+        payload = {key: value for key, value in values.items() if value is not None}
+        return cls.model_validate(payload)
+
     def with_overrides(self, **overrides: Any) -> "DatabricksSettings":
         payload = self.model_dump()
         normalized_overrides = {key: value for key, value in overrides.items() if value is not None}
@@ -94,4 +99,4 @@ class DatabricksSettings(BaseSettings):
             }
 
         payload.update(normalized_overrides)
-        return self.__class__(**payload)
+        return self.__class__.from_values(**payload)

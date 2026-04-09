@@ -39,7 +39,7 @@ class DatabricksUnityCatalogTools(Toolkit):
         all: bool = False,
         **kwargs,
     ):
-        self.settings = DatabricksSettings(
+        self.settings = DatabricksSettings.from_values(
             host=host,
             token=token,
             client_id=client_id,
