@@ -7,7 +7,7 @@ across all four affected routers: session, memory, evals, knowledge.
 Uses FastAPI TestClient to exercise the real ASGI stack end-to-end.
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import FastAPI
