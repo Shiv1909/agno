@@ -127,8 +127,24 @@ class DatabricksJobsAdminTools(Toolkit):
             return f"Error submitting Databricks one-time run: {e}"
 
     def _normalize_job_settings(self, settings: Dict[str, Any]) -> Dict[str, Any]:
-        _, jobs_service = _get_jobs_sdk()
         normalized = dict(settings)
+        needs_sdk_conversion = any(
+            [
+                isinstance(normalized.get("tasks"), list),
+                isinstance(normalized.get("job_clusters"), list),
+                isinstance(normalized.get("environments"), list),
+                isinstance(normalized.get("queue"), dict),
+                isinstance(normalized.get("schedule"), dict),
+                isinstance(normalized.get("run_as"), dict),
+                isinstance(normalized.get("continuous"), dict),
+                isinstance(normalized.get("trigger"), dict),
+                isinstance(normalized.get("git_source"), dict),
+            ]
+        )
+        if not needs_sdk_conversion:
+            return normalized
+
+        _, jobs_service = _get_jobs_sdk()
 
         if isinstance(normalized.get("tasks"), list):
             normalized["tasks"] = [
@@ -161,6 +177,10 @@ class DatabricksJobsAdminTools(Toolkit):
 
     def _normalize_submit_settings(self, settings: Dict[str, Any]) -> Dict[str, Any]:
         normalized = dict(settings)
+        needs_sdk_conversion = isinstance(normalized.get("tasks"), list) or isinstance(normalized.get("git_source"), dict)
+        if not needs_sdk_conversion:
+            return normalized
+
         _, jobs_service = _get_jobs_sdk()
 
         if isinstance(normalized.get("tasks"), list):

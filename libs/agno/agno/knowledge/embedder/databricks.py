@@ -31,26 +31,41 @@ class DatabricksEmbedder(Embedder):
 
     def _get_settings(self) -> DatabricksSettings:
         if self.settings is None:
-            self.settings = DatabricksSettings()
+            settings_kwargs: Dict[str, Any] = {}
+            if self.host is not None:
+                settings_kwargs["host"] = self.host
+                if self.workspace_url is None:
+                    settings_kwargs["workspace_url"] = self.host
+            if self.workspace_url is not None:
+                settings_kwargs["workspace_url"] = self.workspace_url
+            if self.token is not None:
+                settings_kwargs["token"] = self.token
+            if self.timeout is not None:
+                settings_kwargs["timeout"] = self.timeout
+            if self.max_retries is not None:
+                settings_kwargs["max_retries"] = self.max_retries
+            if self.default_headers is not None:
+                settings_kwargs["default_headers"] = self.default_headers
+            self.settings = DatabricksSettings(**settings_kwargs)
+        else:
+            updates: Dict[str, Any] = {}
+            if self.host is not None:
+                updates["host"] = self.host
+                if self.workspace_url is None:
+                    updates["workspace_url"] = self.host
+            if self.workspace_url is not None:
+                updates["workspace_url"] = self.workspace_url
+            if self.token is not None:
+                updates["token"] = self.token
+            if self.timeout is not None:
+                updates["timeout"] = self.timeout
+            if self.max_retries is not None:
+                updates["max_retries"] = self.max_retries
+            if self.default_headers is not None:
+                updates["default_headers"] = self.default_headers
 
-        updates: Dict[str, Any] = {}
-        if self.host is not None:
-            updates["host"] = self.host
-            if self.workspace_url is None:
-                updates["workspace_url"] = self.host
-        if self.workspace_url is not None:
-            updates["workspace_url"] = self.workspace_url
-        if self.token is not None:
-            updates["token"] = self.token
-        if self.timeout is not None:
-            updates["timeout"] = self.timeout
-        if self.max_retries is not None:
-            updates["max_retries"] = self.max_retries
-        if self.default_headers is not None:
-            updates["default_headers"] = self.default_headers
-
-        if updates:
-            self.settings = self.settings.with_overrides(**updates)
+            if updates:
+                self.settings = self.settings.with_overrides(**updates)
 
         return self.settings
 
