@@ -145,7 +145,7 @@ class DatabricksWorkspaceTools(Toolkit):
             return json.dumps(self._serialize_items(items, limit), default=str)
         except Exception as e:
             log_error(f"Error listing Databricks workspace objects: {str(e)}")
-            return f"Error listing Databricks workspace objects: An internal error occurred. Check server logs for details."
+            return "Error listing Databricks workspace objects: An internal error occurred. Check server logs for details."
 
     def get_workspace_object_status(self, path: str) -> str:
         """Use this function to get metadata for a Databricks workspace object."""
@@ -154,7 +154,7 @@ class DatabricksWorkspaceTools(Toolkit):
             return json.dumps(self._serialize_item(status), default=str)
         except Exception as e:
             log_error(f"Error getting Databricks workspace object status: {str(e)}")
-            return f"Error getting Databricks workspace object status: An internal error occurred. Check server logs for details."
+            return "Error getting Databricks workspace object status: An internal error occurred. Check server logs for details."
 
     def create_directory(self, path: str) -> str:
         """Use this function to create a directory in the Databricks workspace."""
@@ -165,7 +165,7 @@ class DatabricksWorkspaceTools(Toolkit):
             return json.dumps({"path": path, "created": True})
         except Exception as e:
             log_error(f"Error creating Databricks workspace directory: {str(e)}")
-            return f"Error creating Databricks workspace directory: An internal error occurred. Check server logs for details."
+            return "Error creating Databricks workspace directory: An internal error occurred. Check server logs for details."
 
     def create_notebook(
         self,
@@ -182,10 +182,10 @@ class DatabricksWorkspaceTools(Toolkit):
             _, workspace_service = _get_workspace_sdk()
             language_upper = language.upper()
             if not hasattr(workspace_service.Language, language_upper) or language_upper.startswith("_"):
-                return f"Error creating Databricks notebook: unsupported language '{language}'"
+                return "Error creating Databricks notebook: unsupported language '{language}'"
             file_format_upper = file_format.upper()
             if not hasattr(workspace_service.ImportFormat, file_format_upper) or file_format_upper.startswith("_"):
-                return f"Error creating Databricks notebook: unsupported format '{file_format}'"
+                return "Error creating Databricks notebook: unsupported format '{file_format}'"
             self.admin_client.workspace.import_(
                 path=path,
                 content=base64.b64encode(content.encode("utf-8")).decode("utf-8"),
@@ -196,7 +196,7 @@ class DatabricksWorkspaceTools(Toolkit):
             return json.dumps({"path": path, "created": True, "language": language.upper()})
         except Exception as e:
             log_error(f"Error creating Databricks notebook: {str(e)}")
-            return f"Error creating Databricks notebook: An internal error occurred. Check server logs for details."
+            return "Error creating Databricks notebook: An internal error occurred. Check server logs for details."
 
     def import_notebook(
         self,
@@ -220,7 +220,7 @@ class DatabricksWorkspaceTools(Toolkit):
             _, workspace_service = _get_workspace_sdk()
             file_format_upper = file_format.upper()
             if not hasattr(workspace_service.ImportFormat, file_format_upper) or file_format_upper.startswith("_"):
-                return f"Error importing Databricks notebook: unsupported format '{file_format}'"
+                return "Error importing Databricks notebook: unsupported format '{file_format}'"
             import_kwargs: Dict[str, Any] = {
                 "path": path,
                 "content": content_base64,
@@ -233,7 +233,7 @@ class DatabricksWorkspaceTools(Toolkit):
             return json.dumps({"path": path, "imported": True})
         except Exception as e:
             log_error(f"Error importing Databricks notebook: {str(e)}")
-            return f"Error importing Databricks notebook: An internal error occurred. Check server logs for details."
+            return "Error importing Databricks notebook: An internal error occurred. Check server logs for details."
 
     def export_notebook(self, path: str, file_format: str = "SOURCE") -> str:
         """Use this function to export a Databricks notebook or workspace file."""
@@ -241,12 +241,12 @@ class DatabricksWorkspaceTools(Toolkit):
             _, workspace_service = _get_workspace_sdk()
             file_format_upper = file_format.upper()
             if not hasattr(workspace_service.ExportFormat, file_format_upper) or file_format_upper.startswith("_"):
-                return f"Error exporting Databricks notebook: unsupported format '{file_format}'"
+                return "Error exporting Databricks notebook: unsupported format '{file_format}'"
             response = self.client.workspace.export_(path=path, format=getattr(workspace_service.ExportFormat, file_format_upper))
             return json.dumps(self._serialize_item(response), default=str)
         except Exception as e:
             log_error(f"Error exporting Databricks notebook: {str(e)}")
-            return f"Error exporting Databricks notebook: An internal error occurred. Check server logs for details."
+            return "Error exporting Databricks notebook: An internal error occurred. Check server logs for details."
 
     def delete_workspace_object(self, path: str, recursive: bool = False) -> str:
         """Use this function to delete a Databricks workspace object or directory."""
@@ -257,7 +257,7 @@ class DatabricksWorkspaceTools(Toolkit):
             return json.dumps({"path": path, "deleted": True, "recursive": recursive})
         except Exception as e:
             log_error(f"Error deleting Databricks workspace object: {str(e)}")
-            return f"Error deleting Databricks workspace object: An internal error occurred. Check server logs for details."
+            return "Error deleting Databricks workspace object: An internal error occurred. Check server logs for details."
 
     def _serialize_items(self, items, limit=None) -> List[Dict[str, Any]]:
         from agno.tools.databricks_tool_utils import serialize_sdk_items

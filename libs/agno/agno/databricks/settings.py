@@ -160,7 +160,7 @@ class DatabricksSettings(BaseSettings):
             explicit_keys.add("host")
         validated_dump = validated.model_dump()
         filtered = {k: v for k, v in validated_dump.items() if k in explicit_keys}
-        return cls.model_validate(filtered)
+        return cls(**filtered)
 
     def with_overrides(self, **overrides: Any) -> "DatabricksSettings":
         payload = self.model_dump()

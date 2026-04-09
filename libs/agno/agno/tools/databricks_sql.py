@@ -159,7 +159,7 @@ class DatabricksSQLTools(Toolkit):
                 return json.dumps(rows, default=str)
         except Exception as e:
             log_error(f"Error listing Databricks catalogs: {str(e)}")
-            return f"Error listing Databricks catalogs: An internal error occurred. Check server logs for details."
+            return "Error listing Databricks catalogs: An internal error occurred. Check server logs for details."
 
     def list_schemas(self, catalog_name: Optional[str] = None, limit: int = 100) -> str:
         """Use this function to list schemas in a Databricks catalog."""
@@ -171,7 +171,7 @@ class DatabricksSQLTools(Toolkit):
                 return json.dumps(rows, default=str)
         except Exception as e:
             log_error(f"Error listing Databricks schemas: {str(e)}")
-            return f"Error listing Databricks schemas: An internal error occurred. Check server logs for details."
+            return "Error listing Databricks schemas: An internal error occurred. Check server logs for details."
 
     def list_tables(
         self,
@@ -193,7 +193,7 @@ class DatabricksSQLTools(Toolkit):
                 return json.dumps(rows, default=str)
         except Exception as e:
             log_error(f"Error listing Databricks tables: {str(e)}")
-            return f"Error listing Databricks tables: An internal error occurred. Check server logs for details."
+            return "Error listing Databricks tables: An internal error occurred. Check server logs for details."
 
     def describe_table(
         self,
@@ -222,7 +222,7 @@ class DatabricksSQLTools(Toolkit):
                 return json.dumps(rows, default=str)
         except Exception as e:
             log_error(f"Error describing Databricks table: {str(e)}")
-            return f"Error describing Databricks table: An internal error occurred. Check server logs for details."
+            return "Error describing Databricks table: An internal error occurred. Check server logs for details."
 
     def run_sql_query(self, query: str, limit: int = 100) -> str:
         """Use this function to run a read-only SQL query on Databricks SQL."""
@@ -236,7 +236,7 @@ class DatabricksSQLTools(Toolkit):
             return f"Error running Databricks SQL query: {e}"
         except Exception as e:
             log_error(f"Error running Databricks SQL query: {str(e)}")
-            return f"Error running Databricks SQL query: An internal error occurred. Check server logs for details."
+            return "Error running Databricks SQL query: An internal error occurred. Check server logs for details."
 
     def explain_sql_query(self, query: str, limit: int = 200) -> str:
         """Use this function to inspect the execution plan for a read-only SQL query."""
@@ -254,7 +254,7 @@ class DatabricksSQLTools(Toolkit):
             return f"Error explaining Databricks SQL query: {e}"
         except Exception as e:
             log_error(f"Error explaining Databricks SQL query: {str(e)}")
-            return f"Error explaining Databricks SQL query: An internal error occurred. Check server logs for details."
+            return "Error explaining Databricks SQL query: An internal error occurred. Check server logs for details."
 
     def _format_query_result(self, cursor: Any, limit: int) -> str:
         if cursor.description is None:

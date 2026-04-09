@@ -4,7 +4,6 @@ These tests attempt to bypass or break the admin gates that protect
 mutation operations in the Databricks tools.
 """
 
-import json
 
 import pytest
 

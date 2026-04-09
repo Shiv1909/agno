@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from agno.filters import AND, EQ, GT, IN, NOT, OR
+from agno.filters import AND, EQ, NOT, OR
 from agno.knowledge.document import Document
 from agno.vectordb.databricks import DatabricksVectorDb
 

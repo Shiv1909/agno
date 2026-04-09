@@ -15,7 +15,6 @@ from agno.exceptions import ModelProviderError
 from agno.media import Video
 from agno.models.databricks import Databricks
 from agno.models.message import Message
-from agno.models.response import ModelResponse
 
 
 # ---------------------------------------------------------------------------

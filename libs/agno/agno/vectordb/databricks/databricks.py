@@ -1,7 +1,7 @@
 import asyncio
 import json
 from hashlib import md5, sha256
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from agno.databricks.settings import DatabricksSettings
 from agno.filters import FilterExpr, get_filter_value, matches_filter_expr
@@ -361,7 +361,6 @@ class DatabricksVectorDb(VectorDb):
 
     def update_metadata(self, content_id: str, metadata: Dict[str, Any]) -> None:
         # Use a scan that includes the embedding vector so it survives re-upsert
-        scan_columns = list(set(self.return_columns + [self.embedding_vector_column]))
         rows_to_update: List[Dict[str, Any]] = []
         last_pk = None
         while True:

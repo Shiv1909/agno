@@ -5,7 +5,7 @@ in batch processing, dimension auto-learning quirks, client reuse, async
 error paths, and auth/settings edge cases.
 """
 
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 

@@ -186,7 +186,7 @@ class DatabricksVectorSearchTools(Toolkit):
             return json.dumps(self._serialize_items(endpoints, limit), default=str)
         except Exception as e:
             log_error(f"Error listing Databricks vector search endpoints: {str(e)}")
-            return f"Error listing Databricks vector search endpoints: An internal error occurred. Check server logs for details."
+            return "Error listing Databricks vector search endpoints: An internal error occurred. Check server logs for details."
 
     def create_endpoint(
         self,
@@ -212,7 +212,7 @@ class DatabricksVectorSearchTools(Toolkit):
             return json.dumps(self._serialize_item(response), default=str)
         except Exception as e:
             log_error(f"Error creating Databricks vector search endpoint: {str(e)}")
-            return f"Error creating Databricks vector search endpoint: An internal error occurred. Check server logs for details."
+            return "Error creating Databricks vector search endpoint: An internal error occurred. Check server logs for details."
 
     def create_delta_sync_index(
         self,
@@ -283,7 +283,7 @@ class DatabricksVectorSearchTools(Toolkit):
             return json.dumps(self._serialize_item(response), default=str)
         except Exception as e:
             log_error(f"Error creating Databricks delta sync vector search index: {str(e)}")
-            return f"Error creating Databricks delta sync vector search index: An internal error occurred. Check server logs for details."
+            return "Error creating Databricks delta sync vector search index: An internal error occurred. Check server logs for details."
 
     def create_direct_access_index(
         self,
@@ -323,7 +323,7 @@ class DatabricksVectorSearchTools(Toolkit):
             return json.dumps(self._serialize_item(response), default=str)
         except Exception as e:
             log_error(f"Error creating Databricks direct access vector search index: {str(e)}")
-            return f"Error creating Databricks direct access vector search index: An internal error occurred. Check server logs for details."
+            return "Error creating Databricks direct access vector search index: An internal error occurred. Check server logs for details."
 
     def list_indexes(self, endpoint_name: Optional[str] = None, limit: Optional[int] = None) -> str:
         """Use this function to list indexes under a Databricks Vector Search endpoint."""
@@ -335,7 +335,7 @@ class DatabricksVectorSearchTools(Toolkit):
             return json.dumps(self._serialize_items(indexes, limit), default=str)
         except Exception as e:
             log_error(f"Error listing Databricks vector search indexes: {str(e)}")
-            return f"Error listing Databricks vector search indexes: An internal error occurred. Check server logs for details."
+            return "Error listing Databricks vector search indexes: An internal error occurred. Check server logs for details."
 
     def describe_index(self, index_name: Optional[str] = None, endpoint_name: Optional[str] = None) -> str:
         """Use this function to describe a Databricks Vector Search index."""
@@ -344,7 +344,7 @@ class DatabricksVectorSearchTools(Toolkit):
             return json.dumps(self._serialize_item(index.describe()), default=str)
         except Exception as e:
             log_error(f"Error describing Databricks vector search index: {str(e)}")
-            return f"Error describing Databricks vector search index: An internal error occurred. Check server logs for details."
+            return "Error describing Databricks vector search index: An internal error occurred. Check server logs for details."
 
     def query_index(
         self,
@@ -380,7 +380,7 @@ class DatabricksVectorSearchTools(Toolkit):
             return json.dumps(response, default=str)
         except Exception as e:
             log_error(f"Error querying Databricks vector search index: {str(e)}")
-            return f"Error querying Databricks vector search index: An internal error occurred. Check server logs for details."
+            return "Error querying Databricks vector search index: An internal error occurred. Check server logs for details."
 
     def sync_index(self, index_name: Optional[str] = None, endpoint_name: Optional[str] = None) -> str:
         """Use this function to trigger a sync for a triggered Databricks delta-sync index."""
@@ -392,7 +392,7 @@ class DatabricksVectorSearchTools(Toolkit):
             return json.dumps(self._serialize_item(response), default=str)
         except Exception as e:
             log_error(f"Error syncing Databricks vector search index: {str(e)}")
-            return f"Error syncing Databricks vector search index: An internal error occurred. Check server logs for details."
+            return "Error syncing Databricks vector search index: An internal error occurred. Check server logs for details."
 
     def upsert_vectors(
         self,
@@ -413,7 +413,7 @@ class DatabricksVectorSearchTools(Toolkit):
             return json.dumps(self._serialize_item(response), default=str)
         except Exception as e:
             log_error(f"Error upserting Databricks vector search vectors: {str(e)}")
-            return f"Error upserting Databricks vector search vectors: An internal error occurred. Check server logs for details."
+            return "Error upserting Databricks vector search vectors: An internal error occurred. Check server logs for details."
 
     def delete_vectors(
         self,
@@ -434,7 +434,7 @@ class DatabricksVectorSearchTools(Toolkit):
             return json.dumps(self._serialize_item(response), default=str)
         except Exception as e:
             log_error(f"Error deleting Databricks vector search vectors: {str(e)}")
-            return f"Error deleting Databricks vector search vectors: An internal error occurred. Check server logs for details."
+            return "Error deleting Databricks vector search vectors: An internal error occurred. Check server logs for details."
 
     def _get_index(self, endpoint_name: Optional[str], index_name: Optional[str], use_admin_client: bool = False):
         resolved_endpoint = endpoint_name or self.default_endpoint_name
