@@ -214,29 +214,29 @@ class SubAgentToolkit(Toolkit):
             running inside an async application.
         """
         spawn_depth = (getattr(self._parent, "metadata", None) or {}).get("spawn_depth", 0) + 1
-        t0 = time.monotonic()
-        if self._config.log_subagent_runs:
-            log_info(f"Spawning subagent '{role}' | task={task[:80]!r} | depth={spawn_depth}")
         with self._sync_semaphore:
+            t0 = time.monotonic()
+            if self._config.log_subagent_runs:
+                log_info(f"Spawning subagent '{role}' | task={task[:80]!r} | depth={spawn_depth}")
             subagent = self._build_subagent(role, instructions, tools, expected_output, model_tier, task)
             try:
                 result = subagent.run(input=task, stream=False)
             except Exception as e:
                 log_warning(f"Subagent '{role}' failed: {e}")
                 return f"Subagent '{role}' failed: {e}"
-        if self._config.log_subagent_runs:
-            duration = time.monotonic() - t0
-            m = result.metrics if result else None
-            token_str = (
-                f" | tokens={m.total_tokens} (in={m.input_tokens} out={m.output_tokens})"
-                if m and m.total_tokens
-                else ""
-            )
-            log_info(f"Subagent '{role}' completed{token_str} | duration={duration:.2f}s | depth={spawn_depth}")
-        if self._config.show_subagent_output and result and result.content:
-            print(f"\n--- Subagent: {role} ---")
-            print(result.content)
-            print(f"--- End Subagent: {role} ---\n")
+            if self._config.log_subagent_runs:
+                duration = time.monotonic() - t0
+                m = result.metrics if result else None
+                token_str = (
+                    f" | tokens={m.total_tokens} (in={m.input_tokens} out={m.output_tokens})"
+                    if m and m.total_tokens
+                    else ""
+                )
+                log_info(f"Subagent '{role}' completed{token_str} | duration={duration:.2f}s | depth={spawn_depth}")
+            if self._config.show_subagent_output and result and result.content:
+                print(f"\n--- Subagent: {role} ---")
+                print(result.content)
+                print(f"--- End Subagent: {role} ---\n")
         if result and result.content:
             return str(result.content)
         return "Subagent completed with no output."
@@ -267,29 +267,29 @@ class SubAgentToolkit(Toolkit):
             The string content returned by the subagent, or a fallback message.
         """
         spawn_depth = (getattr(self._parent, "metadata", None) or {}).get("spawn_depth", 0) + 1
-        t0 = time.monotonic()
-        if self._config.log_subagent_runs:
-            log_info(f"Spawning subagent '{role}' | task={task[:80]!r} | depth={spawn_depth}")
         async with await self._get_async_semaphore():
+            t0 = time.monotonic()
+            if self._config.log_subagent_runs:
+                log_info(f"Spawning subagent '{role}' | task={task[:80]!r} | depth={spawn_depth}")
             subagent = self._build_subagent(role, instructions, tools, expected_output, model_tier, task)
             try:
                 result = await subagent.arun(input=task, stream=False)
             except Exception as e:
                 log_warning(f"Subagent '{role}' failed: {e}")
                 return f"Subagent '{role}' failed: {e}"
-        if self._config.log_subagent_runs:
-            duration = time.monotonic() - t0
-            m = result.metrics if result else None
-            token_str = (
-                f" | tokens={m.total_tokens} (in={m.input_tokens} out={m.output_tokens})"
-                if m and m.total_tokens
-                else ""
-            )
-            log_info(f"Subagent '{role}' completed{token_str} | duration={duration:.2f}s | depth={spawn_depth}")
-        if self._config.show_subagent_output and result and result.content:
-            print(f"\n--- Subagent: {role} ---")
-            print(result.content)
-            print(f"--- End Subagent: {role} ---\n")
+            if self._config.log_subagent_runs:
+                duration = time.monotonic() - t0
+                m = result.metrics if result else None
+                token_str = (
+                    f" | tokens={m.total_tokens} (in={m.input_tokens} out={m.output_tokens})"
+                    if m and m.total_tokens
+                    else ""
+                )
+                log_info(f"Subagent '{role}' completed{token_str} | duration={duration:.2f}s | depth={spawn_depth}")
+            if self._config.show_subagent_output and result and result.content:
+                print(f"\n--- Subagent: {role} ---")
+                print(result.content)
+                print(f"--- End Subagent: {role} ---\n")
         if result and result.content:
             return str(result.content)
         return "Subagent completed with no output."

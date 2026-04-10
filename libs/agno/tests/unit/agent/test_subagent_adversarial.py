@@ -725,3 +725,51 @@ def test_build_subagent_logs_when_template_overrides_conflict():
         f"Expected a debug log mentioning template field overrides. "
         f"Got debug messages: {debug_messages}"
     )
+
+
+# ---------------------------------------------------------------------------
+# 21. Log emission happens after semaphore acquire (not before)
+# ---------------------------------------------------------------------------
+
+
+def test_sync_spawn_log_emitted_after_semaphore_acquire():
+    """The 'Spawning subagent' log must fire AFTER the sync semaphore is
+    acquired, so log timestamps reflect real start time under concurrency."""
+    events: list[str] = []
+
+    class _TracingSemaphore:
+        def __init__(self, inner: threading.Semaphore) -> None:
+            self._inner = inner
+
+        def __enter__(self):
+            events.append("sem_enter")
+            self._inner.__enter__()
+            return self
+
+        def __exit__(self, *exc):
+            self._inner.__exit__(*exc)
+            events.append("sem_exit")
+            return False
+
+    mock_agent = _mock_agent()
+    parent = _make_parent(template=mock_agent)
+    toolkit = SubAgentToolkit(parent=parent, config=SubAgentConfig(max_concurrent=1))
+    toolkit._sync_semaphore = _TracingSemaphore(threading.Semaphore(1))  # type: ignore
+
+    def fake_log_info(msg: str, *a: Any, **kw: Any) -> None:
+        events.append(f"log:{msg[:30]}")
+
+    with patch("agno.agent.subagent.log_info", side_effect=fake_log_info):
+        toolkit.spawn_agent(role="tester", instructions="i", task="t")
+
+    # The first Spawning log must come AFTER sem_enter, not before it.
+    try:
+        sem_enter_idx = events.index("sem_enter")
+    except ValueError:
+        pytest.fail(f"sem_enter not observed. events={events}")
+
+    spawn_log_idxs = [i for i, e in enumerate(events) if e.startswith("log:") and "Spawn" in e]
+    assert spawn_log_idxs, f"no Spawning log observed. events={events}"
+    assert spawn_log_idxs[0] > sem_enter_idx, (
+        f"Spawning log fired BEFORE semaphore acquire. events={events}"
+    )
