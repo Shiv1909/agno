@@ -14,11 +14,12 @@ These tests exercise edge cases the existing test suite does not cover:
 - task truncation in metadata
 - Permutations of config flags
 """
+
 from __future__ import annotations
 
 import asyncio
 import threading
-from typing import Any, List, Optional
+from typing import Any, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -157,10 +158,7 @@ async def test_async_max_concurrent_enforced():
 
     async def run_all() -> None:
         tasks = [
-            asyncio.create_task(
-                toolkit.aspawn_agent(role=f"r{i}", instructions="i", task=f"t{i}")
-            )
-            for i in range(5)
+            asyncio.create_task(toolkit.aspawn_agent(role=f"r{i}", instructions="i", task=f"t{i}")) for i in range(5)
         ]
         await asyncio.sleep(0.05)  # let them try to start
         gate.set()
@@ -272,6 +270,7 @@ def test_allowed_tools_requested_tool_not_in_parent_silently_dropped():
 
 def test_plain_callable_tools_filtered_by_name():
     """Plain callables are matched by __name__."""
+
     def my_fn() -> str:
         return "x"
 
@@ -423,6 +422,7 @@ def test_task_truncated_in_metadata():
 def test_agent_callable_instructions_does_not_crash_init():
     """enable_dynamic_subagents=True + callable instructions → init should
     complete (tools still wired, instructions left alone)."""
+
     def make_instructions(agent: Any) -> str:
         return "dynamic instructions"
 
@@ -480,9 +480,7 @@ def test_sync_max_concurrent_enforced():
     parent.subagent_template = mock
 
     threads = [
-        threading.Thread(
-            target=tk.spawn_agent, kwargs={"role": f"r{i}", "instructions": "i", "task": f"t{i}"}
-        )
+        threading.Thread(target=tk.spawn_agent, kwargs={"role": f"r{i}", "instructions": "i", "task": f"t{i}"})
         for i in range(5)
     ]
     for t in threads:
@@ -579,8 +577,12 @@ def test_inherit_parent_tools_subagent_can_spawn_recursively():
 
     toolkit = next(t for t in parent.tools if isinstance(t, SubAgentToolkit))
     subagent = toolkit._build_subagent(
-        role="worker", instructions="work", tool_names=None,
-        expected_output=None, model_tier=None, task="do the thing",
+        role="worker",
+        instructions="work",
+        tool_names=None,
+        expected_output=None,
+        model_tier=None,
+        task="do the thing",
     )
 
     # The subagent inherited the parent's tools, which include SubAgentToolkit
@@ -611,6 +613,7 @@ def test_subagent_config_rejects_unknown_fields():
 
 def test_agent_tools_factory_warns_and_skips_wiring():
     """enable_dynamic_subagents=True + tools as callable factory → warning."""
+
     def tool_factory() -> list:
         return []
 
@@ -722,8 +725,7 @@ def test_build_subagent_logs_when_template_overrides_conflict():
     # At least one debug log should mention the override
     override_logs = [m for m in debug_messages if "override" in m.lower() or "overriding" in m.lower()]
     assert override_logs, (
-        f"Expected a debug log mentioning template field overrides. "
-        f"Got debug messages: {debug_messages}"
+        f"Expected a debug log mentioning template field overrides. Got debug messages: {debug_messages}"
     )
 
 
@@ -770,6 +772,4 @@ def test_sync_spawn_log_emitted_after_semaphore_acquire():
 
     spawn_log_idxs = [i for i, e in enumerate(events) if e.startswith("log:") and "Spawn" in e]
     assert spawn_log_idxs, f"no Spawning log observed. events={events}"
-    assert spawn_log_idxs[0] > sem_enter_idx, (
-        f"Spawning log fired BEFORE semaphore acquire. events={events}"
-    )
+    assert spawn_log_idxs[0] > sem_enter_idx, f"Spawning log fired BEFORE semaphore acquire. events={events}"
