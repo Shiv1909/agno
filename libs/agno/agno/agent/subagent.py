@@ -534,12 +534,16 @@ class SubAgentToolkit(Toolkit):
         The state is embedded as read-only JSON — the subagent cannot write back
         to the parent's session.  We intentionally do *not* pass it as the live
         ``session_state`` argument to ``run()`` to avoid unintentional mutation.
+
+        Falls back to ``repr()`` (capped at 4KB) if the state contains circular
+        references or other structures ``json.dumps`` cannot handle.
         """
         if not self._config.inject_session_state:
             return None
         state = getattr(self._parent, "session_state", None)
         if not state:
             return None
+
         _warned = False
 
         def _default_serializer(obj: object) -> str:
@@ -553,4 +557,14 @@ class SubAgentToolkit(Toolkit):
                 _warned = True
             return str(obj)
 
-        return "Parent session state (read-only):\n" + json.dumps(state, indent=2, default=_default_serializer)
+        try:
+            serialized = json.dumps(state, indent=2, default=_default_serializer)
+        except (ValueError, TypeError) as e:
+            log_warning(
+                f"session_state could not be JSON-serialized "
+                f"({e.__class__.__name__}: {e}); falling back to repr(). "
+                f"Check for circular references or unsupported types."
+            )
+            serialized = repr(state)[:4000]
+
+        return "Parent session state (read-only):\n" + serialized
