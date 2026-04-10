@@ -470,13 +470,25 @@ class SubAgentToolkit(Toolkit):
         """Build the tool list for the spawned subagent.
 
         Priority / composition:
-        1. ``inherit_parent_tools=True`` → return parent's full tool list (ignores template & selection)
+        1. ``inherit_parent_tools=True`` → return parent's full tool list minus any
+           ``SubAgentToolkit`` instances (prevents recursive spawning)
         2. Start from template's own tools as the base
         3. ``allow_tool_selection=True`` + ``tool_names`` → append matching parent tools
-           (filtered against ``allowed_tools`` whitelist)
+           (filtered against ``allowed_tools`` whitelist, ``SubAgentToolkit`` excluded)
         """
         if self._config.inherit_parent_tools:
-            return list(getattr(self._parent, "tools", None) or []) or None
+            parent_tools_raw = getattr(self._parent, "tools", None)
+            if parent_tools_raw is None:
+                # Parent has no tools at all — return None so the caller falls back
+                # to the template's tools (nothing to inherit and nothing to strip).
+                return None
+            # Filter out SubAgentToolkit — a spawned subagent must never be able
+            # to spawn further subagents even if inherit_parent_tools=True.
+            # Return the filtered list as-is (even if empty) rather than collapsing
+            # to None. An empty list means "explicit override: no tools" — collapsing
+            # to None would fall back to the template's tools, which could re-leak
+            # tools the caller explicitly filtered out.
+            return [t for t in parent_tools_raw if not isinstance(t, SubAgentToolkit)]
 
         # Base: template tools
         result: List[Any] = list(template_tools or [])
@@ -485,14 +497,20 @@ class SubAgentToolkit(Toolkit):
             return result or None
 
         parent_tools: List[Any] = list(getattr(self._parent, "tools", None) or [])
-        allowed = set(self._config.allowed_tools) if self._config.allowed_tools else None
+        # Use `is not None` rather than truthiness so that allowed_tools=[]
+        # correctly means "empty whitelist, block everything" instead of being
+        # treated as the "no whitelist" sentinel (allowed_tools=None).
+        allowed = set(self._config.allowed_tools) if self._config.allowed_tools is not None else None
         requested = set(tool_names)
-        permitted = (allowed & requested) if allowed else requested
+        permitted = (allowed & requested) if allowed is not None else requested
 
         from agno.tools import Toolkit as _Toolkit
         from agno.tools.function import Function as _Function
 
         for tool in parent_tools:
+            # Defense in depth: never delegate the spawn toolkit, regardless of name match
+            if isinstance(tool, SubAgentToolkit):
+                continue
             if isinstance(tool, _Toolkit):
                 # Extract only the individually-permitted Function objects.
                 # Never delegate the entire toolkit — that would bypass the whitelist
