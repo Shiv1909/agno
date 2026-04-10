@@ -693,3 +693,35 @@ def test_team_tools_factory_warns_and_skips_wiring():
     assert any("callable factory" in m for m in warnings_msgs), (
         f"Expected callable-factory warning on Team; got: {warnings_msgs}"
     )
+
+
+# ---------------------------------------------------------------------------
+# 20. Template override logging (ephemeral settings clobber template)
+# ---------------------------------------------------------------------------
+
+
+def test_build_subagent_logs_when_template_overrides_conflict():
+    """When the template has non-ephemeral settings that _build_subagent
+    hardcodes away, a debug log should tell the user their template field
+    was overridden."""
+    # Template sets telemetry=True and num_history_runs=5 — both will be
+    # clobbered by the ephemeral overrides in _build_subagent.
+    template = Agent(name="tmpl", telemetry=True, num_history_runs=5)
+    parent = Agent(
+        name="p",
+        enable_dynamic_subagents=True,
+        subagent_template=template,
+    )
+    parent.initialize_agent()
+    toolkit = next(t for t in parent.tools if isinstance(t, SubAgentToolkit))
+
+    with patch("agno.agent.subagent.log_debug") as mock_debug:
+        toolkit._build_subagent("r", "i", None, None, None, "t")
+
+    debug_messages = [str(call) for call in mock_debug.call_args_list]
+    # At least one debug log should mention the override
+    override_logs = [m for m in debug_messages if "override" in m.lower() or "overriding" in m.lower()]
+    assert override_logs, (
+        f"Expected a debug log mentioning template field overrides. "
+        f"Got debug messages: {debug_messages}"
+    )

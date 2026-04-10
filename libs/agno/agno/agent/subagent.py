@@ -47,6 +47,13 @@ class SubAgentConfig(BaseModel):
     subagent's model, knowledge base, tools, and any other capability via
     ``Agent.subagent_template``.
 
+    .. note::
+        Spawned subagents are always ephemeral: ``db``, ``stream``,
+        ``telemetry``, ``num_history_runs``, and ``enable_dynamic_subagents``
+        are forced to ephemeral defaults (``None``/``False``/``0``) regardless
+        of what the ``subagent_template`` specifies. Set these fields on the
+        parent agent instead. Overrides are logged at debug level.
+
     Example::
 
         from agno.agent import Agent, SubAgentConfig
@@ -422,6 +429,24 @@ class SubAgentToolkit(Toolkit):
                 "spawn_depth": spawn_depth,
             },
         }
+        # Log which template fields we are clobbering with ephemeral defaults.
+        # These are intentional — subagents are meant to be stateless, non-telemetered,
+        # single-run workers — but users should see it in debug logs.
+        _ephemeral_defaults = {
+            "db": None,
+            "stream": False,
+            "telemetry": False,
+            "num_history_runs": 0,
+            "enable_dynamic_subagents": False,
+        }
+        for _field, _ephemeral_value in _ephemeral_defaults.items():
+            _template_value = getattr(template, _field, None)
+            if _template_value is not None and _template_value != _ephemeral_value:
+                log_debug(
+                    f"Subagent '{role}': overriding template field '{_field}' "
+                    f"({_template_value!r} -> {_ephemeral_value!r}) "
+                    f"because subagents are ephemeral."
+                )
         # Only override tools when we have an explicit resolution.
         # None means "keep whatever the template already has configured".
         if resolved_tools is not None:
