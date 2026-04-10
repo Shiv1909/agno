@@ -709,6 +709,15 @@ def _set_dynamic_subagents(team: "Team") -> None:
 
     from agno.agent.subagent import SubAgentToolkit
 
+    # If tools is a callable factory, we cannot introspect or append safely.
+    # Warn and skip — the user must pass tools as a list to use dynamic subagents.
+    if callable(team.tools) and not isinstance(team.tools, list):
+        log_warning(
+            "enable_dynamic_subagents=True is not supported when tools is a callable factory. "
+            "Pass tools as a list instead. Skipping SubAgentToolkit wiring."
+        )
+        return
+
     # Idempotency guard: do not add a second toolkit on subsequent initialize_team() calls
     if any(isinstance(t, SubAgentToolkit) for t in (team.tools or [])):
         return
@@ -731,11 +740,7 @@ def _set_dynamic_subagents(team: "Team") -> None:
         team.tools.append(toolkit)
     elif team.tools is None:
         team.tools = [toolkit]
-    else:
-        log_warning(
-            "enable_dynamic_subagents=True is not supported when tools is a callable factory. "
-            "Pass tools as a list instead."
-        )
+    # No `else` branch: callable case was handled above.
 
 
 def initialize_team(team: "Team", debug_mode: Optional[bool] = None) -> None:

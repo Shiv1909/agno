@@ -675,3 +675,21 @@ def test_spawn_depth_uses_parent_metadata_not_template():
     assert subagent.metadata.get("spawn_depth") == 4, (
         f"spawn_depth should use parent.metadata (3→4), got {subagent.metadata.get('spawn_depth')}"
     )
+
+
+def test_team_tools_factory_warns_and_skips_wiring():
+    """enable_dynamic_subagents=True + tools as callable factory on Team → warning, no crash."""
+    from agno.team.team import Team
+
+    def tool_factory() -> list:
+        return []
+
+    member = Agent(name="m")
+    with patch("agno.team._init.log_warning") as mock_warn:
+        team = Team(members=[member], enable_dynamic_subagents=True, tools=tool_factory)
+        team.initialize_team()
+
+    warnings_msgs = [str(call) for call in mock_warn.call_args_list]
+    assert any("callable factory" in m for m in warnings_msgs), (
+        f"Expected callable-factory warning on Team; got: {warnings_msgs}"
+    )
