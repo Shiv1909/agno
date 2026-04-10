@@ -301,8 +301,18 @@ class SubAgentToolkit(Toolkit):
     def build_guidance(self) -> str:
         """Return the context-isolation guidance block for the parent's system prompt.
 
-        This is called once by :func:`set_dynamic_subagents` / :func:`_set_dynamic_subagents`
-        during agent/team initialisation and appended to the parent's instructions.
+        This is called once by :func:`set_dynamic_subagents` /
+        :func:`_set_dynamic_subagents` during agent/team initialisation and
+        appended to the parent's instructions.
+
+        .. warning::
+            The returned string is a **snapshot** of ``SubAgentConfig`` at
+            initialisation time. Mutating ``subagent_config`` after
+            ``initialize_agent()`` / ``initialize_team()`` (e.g. adding a
+            new ``context_heavy_tool``) will **not** update the guidance —
+            the LLM will continue to see the original text. Reconfigure
+            before initialisation, or rebuild the agent if you need to
+            change this at runtime.
         """
         lines = [
             "--- Dynamic Subagent Guidance ---",
