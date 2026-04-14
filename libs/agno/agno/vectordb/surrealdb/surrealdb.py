@@ -27,13 +27,15 @@ class SurrealDb(VectorDb):
         DEFINE TABLE IF NOT EXISTS {collection} SCHEMAFUL;
         DEFINE FIELD IF NOT EXISTS content ON {collection} TYPE string;
         DEFINE FIELD IF NOT EXISTS embedding ON {collection} TYPE array<float>;
+        DEFINE FIELD IF NOT EXISTS name ON {collection} TYPE option<string>;
+        DEFINE FIELD IF NOT EXISTS content_id ON {collection} TYPE option<string>;
         DEFINE FIELD IF NOT EXISTS meta_data ON {collection} TYPE object FLEXIBLE;
         DEFINE INDEX IF NOT EXISTS vector_idx ON {collection} FIELDS embedding HNSW DIMENSION {dimensions} DIST {distance};
     """
 
     NAME_EXISTS_QUERY: Final[str] = """
         SELECT * FROM {collection}
-        WHERE meta_data.name = $name
+        WHERE name = $name
         LIMIT 1
     """
 
@@ -56,7 +58,7 @@ class SurrealDb(VectorDb):
 
     DELETE_BY_NAME_QUERY: Final[str] = """
         DELETE FROM {collection}
-        WHERE meta_data.name = $name
+        WHERE name = $name
     """
 
     DELETE_BY_METADATA_QUERY: Final[str] = """
@@ -73,13 +75,17 @@ class SurrealDb(VectorDb):
         UPSERT {thing}
         SET content = $content,
             embedding = $embedding,
-            meta_data = $meta_data
+            meta_data = $meta_data,
+            name = $name,
+            content_id = $content_id
     """
 
     SEARCH_QUERY: Final[str] = """
         SELECT
             content,
             meta_data,
+            name,
+            content_id,
             vector::distance::knn() as distance
         FROM {collection}
         WHERE embedding <|{limit}, {search_ef}|> $query_embedding
@@ -272,7 +278,13 @@ class SurrealDb(VectorDb):
             doc.embed(embedder=self.embedder)
             meta_data: Dict[str, Any] = doc.meta_data if isinstance(doc.meta_data, dict) else {}
             meta_data["content_hash"] = content_hash
-            data: Dict[str, Any] = {"content": doc.content, "embedding": doc.embedding, "meta_data": meta_data}
+            data: Dict[str, Any] = {
+                "content": doc.content,
+                "embedding": doc.embedding,
+                "meta_data": meta_data,
+                "name": doc.name,
+                "content_id": doc.content_id,
+            }
             if filters:
                 data["meta_data"].update(filters)
             self.client.create(self.collection, data)
@@ -290,7 +302,13 @@ class SurrealDb(VectorDb):
             doc.embed(embedder=self.embedder)
             meta_data: Dict[str, Any] = doc.meta_data if isinstance(doc.meta_data, dict) else {}
             meta_data["content_hash"] = content_hash
-            data: Dict[str, Any] = {"content": doc.content, "embedding": doc.embedding, "meta_data": meta_data}
+            data: Dict[str, Any] = {
+                "content": doc.content,
+                "embedding": doc.embedding,
+                "meta_data": meta_data,
+                "name": doc.name,
+                "content_id": doc.content_id,
+            }
             if filters:
                 data["meta_data"].update(filters)
             thing = f"{self.collection}:{doc.id}" if doc.id else self.collection
@@ -341,6 +359,8 @@ class SurrealDb(VectorDb):
                     content=item.get("content", ""),
                     embedding=item.get("embedding", []),
                     meta_data=item.get("meta_data", {}),
+                    name=item.get("name"),
+                    content_id=item.get("content_id"),
                     embedder=self.embedder,
                 )
                 documents.append(doc)
@@ -498,7 +518,13 @@ class SurrealDb(VectorDb):
             doc.embed(embedder=self.embedder)
             meta_data: Dict[str, Any] = doc.meta_data if isinstance(doc.meta_data, dict) else {}
             meta_data["content_hash"] = content_hash
-            data: Dict[str, Any] = {"content": doc.content, "embedding": doc.embedding, "meta_data": meta_data}
+            data: Dict[str, Any] = {
+                "content": doc.content,
+                "embedding": doc.embedding,
+                "meta_data": meta_data,
+                "name": doc.name,
+                "content_id": doc.content_id,
+            }
             if filters:
                 data["meta_data"].update(filters)
             log_debug(f"Inserting document asynchronously: {doc.name} ({doc.meta_data})")
@@ -519,7 +545,13 @@ class SurrealDb(VectorDb):
             doc.embed(embedder=self.embedder)
             meta_data: Dict[str, Any] = doc.meta_data if isinstance(doc.meta_data, dict) else {}
             meta_data["content_hash"] = content_hash
-            data: Dict[str, Any] = {"content": doc.content, "embedding": doc.embedding, "meta_data": meta_data}
+            data: Dict[str, Any] = {
+                "content": doc.content,
+                "embedding": doc.embedding,
+                "meta_data": meta_data,
+                "name": doc.name,
+                "content_id": doc.content_id,
+            }
             if filters:
                 data["meta_data"].update(filters)
             log_debug(f"Upserting document asynchronously: {doc.name} ({doc.meta_data})")
@@ -572,6 +604,8 @@ class SurrealDb(VectorDb):
                     content=item.get("content", ""),
                     embedding=item.get("embedding", []),
                     meta_data=item.get("meta_data", {}),
+                    name=item.get("name"),
+                    content_id=item.get("content_id"),
                     embedder=self.embedder,
                 )
                 documents.append(doc)
