@@ -8,6 +8,7 @@ from agno.agent.agent import (
     get_agents,
 )
 from agno.agent.remote import RemoteAgent
+from agno.agent.subagent import AsyncSubAgent, SubAgent, SubAgentTarget
 from agno.models.fallback import FallbackConfig
 from agno.run.agent import (
     Followups,
@@ -34,8 +35,11 @@ from agno.run.agent import (
 
 __all__ = [
     "Agent",
+    "AsyncSubAgent",
     "FallbackConfig",
     "RemoteAgent",
+    "SubAgent",
+    "SubAgentTarget",
     "AgentSession",
     "Followups",
     "FollowupsStartedEvent",

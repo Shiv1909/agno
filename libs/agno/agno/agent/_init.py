@@ -242,6 +242,7 @@ def initialize_agent(agent: Agent, debug_mode: Optional[bool] = None) -> None:
     set_debug(agent, debug_mode=debug_mode)
     set_id(agent)
     set_telemetry(agent)
+    register_subagents(agent)
     if agent.update_memory_on_run or agent.enable_agentic_memory or agent.memory_manager is not None:
         set_memory_manager(agent)
     if (
@@ -262,6 +263,64 @@ def initialize_agent(agent: Agent, debug_mode: Optional[bool] = None) -> None:
 
     if agent._formatter is None:
         agent._formatter = SafeFormatter()
+
+
+def register_subagents(agent: Agent) -> None:
+    """Convert subagents into named tools and inject them into agent.tools.
+
+    Called once per agent instance from initialize_agent().  Guarded by
+    agent._subagents_registered to prevent double-registration on repeated runs.
+
+    SubAgent
+        → sync Function (agent.run)  +  async Function (agent.arun)
+        → blocking — coordinator waits for result
+
+    AsyncSubAgent
+        → async launch Function only — returns task_id immediately
+        → sub-agent runs as asyncio.Task in the background
+        → lifecycle tools auto-added: check/update/cancel/list_async_task(s)
+    """
+    if agent._subagents_registered or not agent.subagents:
+        return
+
+    from agno.agent.subagent import AsyncSubAgent, AsyncTaskManager, SubAgent
+    from agno.tools.toolkit import Toolkit as _Toolkit
+
+    # Create one shared AsyncTaskManager if any AsyncSubAgents are present
+    has_async = any(isinstance(sa, AsyncSubAgent) for sa in agent.subagents)
+    manager = AsyncTaskManager() if has_async else None
+
+    # Build a single toolkit that holds all subagent tools
+    toolkit = _Toolkit(name="subagents", tools=[], auto_register=False)
+
+    for sa in agent.subagents:
+        if isinstance(sa, SubAgent):
+            sa.validate(parent=agent)
+            toolkit.register(sa.make_sync_callable(parent=agent))  # → toolkit.functions
+            toolkit.register(sa.make_async_callable(parent=agent))  # → toolkit.async_functions
+        elif isinstance(sa, AsyncSubAgent):
+            assert manager is not None
+            sa.validate(parent=agent)
+            toolkit.register(sa.make_launch_callable(manager, parent=agent))  # → async_functions only
+        else:
+            log_warning(f"register_subagents: unknown subagent type {type(sa)}, skipping")
+
+    # Register lifecycle tools when async sub-agents are present
+    if manager is not None:
+        for fn in manager.make_lifecycle_tools():
+            toolkit.register(fn)  # all are async → async_functions
+        log_debug("Registered async task lifecycle tools (check/update/cancel/list)")
+
+    if toolkit.functions or toolkit.async_functions:
+        if not isinstance(agent.tools, list):
+            agent.tools = []
+        agent.tools.append(toolkit)  # type: ignore[union-attr]
+        log_debug(
+            f"Registered {len(toolkit.functions)} sync + "
+            f"{len(toolkit.async_functions)} async subagent tools"
+        )
+
+    agent._subagents_registered = True
 
 
 def add_tool(agent: Agent, tool: Union[Toolkit, Callable, Function, Dict]) -> None:

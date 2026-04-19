@@ -159,6 +159,12 @@ class Agent:
     # Skills provide structured instructions, reference docs, and scripts for agents
     skills: Optional[Skills] = None
 
+    # --- Sub-Agents ---
+    # Sub-agents that the parent agent can delegate tasks to.
+    # Each SubAgent / AsyncSubAgent becomes its own named tool on the parent.
+    # Use SubAgent for sync+async contexts, AsyncSubAgent for async-only or remote HTTP.
+    subagents: Optional[List[Any]] = None
+
     # --- Agent Tools ---
     # A list of tools provided to the Model.
     # Tools are functions the model may generate JSON inputs for.
@@ -422,6 +428,7 @@ class Agent:
         references_format: Literal["json", "yaml"] = "json",
         skills: Optional[Skills] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        subagents: Optional[List[Any]] = None,
         tools: Optional[Union[Sequence[Union[Toolkit, Callable, Function, Dict]], Callable[..., List]]] = None,
         tool_call_limit: Optional[int] = None,
         tool_choice: Optional[Union[str, Dict[str, Any]]] = None,
@@ -583,6 +590,8 @@ class Agent:
         self._version: Optional[int] = None
         self._stage: Optional[str] = None
 
+        self.subagents = subagents
+
         from agno.utils.callables import is_callable_factory
 
         if tools is None:
@@ -690,6 +699,7 @@ class Agent:
         self._formatter: Optional[SafeFormatter] = None
 
         self._hooks_normalised = False
+        self._subagents_registered = False
 
         self._mcp_tools_initialized_on_run: List[Any] = []
         self._connectable_tools_initialized_on_run: List[Any] = []
