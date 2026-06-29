@@ -34,6 +34,19 @@ class LocalFileSystemTools(Toolkit):
 
         super().__init__(name="write_to_local", tools=tools, **kwargs)
 
+    def _resolve_within_target(self, candidate: Path) -> Optional[Path]:
+        """Resolve ``candidate`` and confine it to ``target_directory``.
+
+        Returns the fully resolved path when it stays inside the target
+        directory, or ``None`` when it would escape (path traversal). The
+        check is version-safe (no ``Path.is_relative_to``, which is 3.9+).
+        """
+        target_base = Path(self.target_directory).resolve()
+        resolved = candidate.resolve()
+        if resolved == target_base or target_base in resolved.parents:
+            return resolved
+        return None
+
     def write_file(
         self,
         content: str,
@@ -63,17 +76,25 @@ class LocalFileSystemTools(Toolkit):
 
             extension = (extension or self.default_extension).lstrip(".")
 
-            # Create directory if it doesn't exist
-            dir_path = Path(directory)
-            dir_path.mkdir(parents=True, exist_ok=True)
-
             # Construct full filename with extension
             full_filename = f"{filename}.{extension}"
-            file_path = dir_path / full_filename
+            file_path = Path(directory) / full_filename
 
-            file_path.write_text(content)
+            # Security: confine all writes to the target directory (prevent path traversal).
+            # Validate before creating any directories so a traversal attempt cannot leave
+            # stray directories outside the sandbox.
+            resolved_path = self._resolve_within_target(file_path)
+            if resolved_path is None:
+                error_msg = "Path traversal detected. Cannot write outside the target directory."
+                log_error(error_msg)
+                return f"Error: {error_msg}"
 
-            return f"Successfully wrote file to: {file_path}"
+            # Create directory if it doesn't exist
+            resolved_path.parent.mkdir(parents=True, exist_ok=True)
+
+            resolved_path.write_text(content)
+
+            return f"Successfully wrote file to: {resolved_path}"
 
         except Exception as e:
             error_msg = f"Failed to write file: {str(e)}"
@@ -85,6 +106,12 @@ class LocalFileSystemTools(Toolkit):
         Read content from a local file.
         """
         file_path = Path(directory or self.target_directory) / filename
-        if not file_path.exists():
-            return f"File not found: {file_path}"
-        return file_path.read_text()
+
+        # Security: confine reads to the target directory (prevent path traversal)
+        resolved_path = self._resolve_within_target(file_path)
+        if resolved_path is None:
+            return "Error: Path traversal detected. Cannot read outside the target directory."
+
+        if not resolved_path.exists():
+            return f"File not found: {resolved_path}"
+        return resolved_path.read_text()
